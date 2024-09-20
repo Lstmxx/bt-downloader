@@ -6,6 +6,8 @@
   "author": "example.com",
   "homepage": "https://electron-vite.org",
   "scripts": {
+    "prepare": "husky",
+    "lint-staged": "lint-staged",
     "format": "prettier --write .",
     "lint": "eslint . --ext .js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts,.vue --fix",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
@@ -23,9 +25,23 @@
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.0",
     "@electron-toolkit/utils": "^3.0.0",
-    "electron-updater": "^6.1.7"
+    "@electron/rebuild": "^3.6.0",
+    "@primevue/themes": "^4.0.4",
+    "@types/webtorrent": "^0.109.8",
+    "electron-store": "8.2.0",
+    "electron-updater": "^6.1.7",
+    "knex": "^3.1.0",
+    "pinia": "^2.2.2",
+    "primeicons": "^7.0.0",
+    "primevue": "^4.0.4",
+    "sqlite3": "^5.1.7",
+    "tailwindcss-primeui": "^0.3.4",
+    "vue-router": "4",
+    "webtorrent": "^2.5.0"
   },
   "devDependencies": {
+    "@commitlint/cli": "^19.4.0",
+    "@commitlint/config-conventional": "^19.2.2",
     "@electron-toolkit/eslint-config": "^1.0.2",
     "@electron-toolkit/eslint-config-ts": "^2.0.0",
     "@electron-toolkit/tsconfig": "^1.0.1",
@@ -34,15 +50,28 @@
     "@vitejs/plugin-vue": "^5.0.5",
     "@vue/eslint-config-prettier": "^9.0.0",
     "@vue/eslint-config-typescript": "^13.0.0",
+    "autoprefixer": "^10.4.20",
     "electron": "^31.0.2",
     "electron-builder": "^24.13.3",
     "electron-vite": "^2.3.0",
     "eslint": "^8.57.0",
     "eslint-plugin-vue": "^9.26.0",
+    "husky": "^9.1.5",
+    "lint-staged": "^15.2.9",
+    "postcss": "^8.4.41",
     "prettier": "^3.3.2",
+    "prettier-eslint": "^16.3.0",
+    "tailwindcss": "^3.4.10",
     "typescript": "^5.5.2",
     "vite": "^5.3.1",
     "vue": "^3.4.30",
     "vue-tsc": "^2.0.22"
-  }
+  },
+  "lint-staged": {
+    "*.{js,ts,vue,tsx}": [
+      "eslint --cache --fix",
+      "git add"
+    ]
+  },
+  "type": "module"
 }
