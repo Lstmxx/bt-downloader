@@ -18,6 +18,7 @@ export const startDownload = async (
 };
 
 export const getDownloadingTasks = async () => {
+  console.log(window.electron);
   const tasks = (await window.ipcRenderer.invoke(IPC_CHANNEL.GET_DOWNLOADING_TASKS)) as TaskInfo[];
   return tasks;
 };

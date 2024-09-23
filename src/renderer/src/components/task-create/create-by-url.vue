@@ -19,7 +19,7 @@ const loading = defineModel("loading", {
 });
 
 const isValidUrl = computed(() => {
-  const reg = /^magnet:\?xt=urn:btih:[0-9a-fA-F]{40,}.*$/;
+  const reg = /magnet:\?xt=urn:btih:([a-zA-Z0-9]+)&dn=([^&]+)&xl=([0-9]+)&tr\.(\d+)=([^&]+)/g;
   return reg.test(url.value);
 });
 

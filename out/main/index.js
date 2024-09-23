@@ -1,8 +1,9 @@
 import { app, ipcMain, BrowserWindow, shell } from "electron";
-import { join } from "path";
+import path, { join } from "path";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import Store from "electron-store";
 import Webtorrent from "webtorrent";
+import fs from "node:fs";
 import __cjs_mod__ from "node:module";
 const __filename = import.meta.filename;
 const __dirname = import.meta.dirname;
@@ -15,8 +16,8 @@ const getDownloadPath = () => {
   return app.getPath("downloads");
 };
 const getConfigBasePath = () => {
-  const path = getUserDataPath();
-  return path;
+  const path2 = getUserDataPath();
+  return path2;
 };
 const IPC_CHANNEL = {
   GET_FILES_BY_URL: "downloader:get-files-by-url",
@@ -106,6 +107,21 @@ const torrentToTaskInfo = (torrent) => {
     done: torrent.done
   };
 };
+const filePath = path.join(__dirname, "../../resources/best-tracker-list.txt");
+console.log("filePath", filePath);
+const getAnnounce = () => {
+  return new Promise((resolve, reject) => {
+    fs.readFile(filePath, "utf-8", (err, data) => {
+      if (err) {
+        reject(err);
+      } else {
+        const dataList = data.split("\n").filter((line) => line.trim() !== "");
+        console.log("dataList", dataList);
+        resolve(dataList);
+      }
+    });
+  });
+};
 const getTorrentFiles = async (instance, torrentUrl) => {
   return new Promise((resolve, reject) => {
     console.log("add:", torrentUrl);
@@ -130,12 +146,16 @@ class Downloader {
   doneTasks = [];
   constructor(win) {
     this.win = win;
+    this.initWebtorrent();
+    this.initListeners();
+  }
+  async initWebtorrent() {
+    const announce = await getAnnounce();
     this.instance = new Webtorrent({
       tracker: {
-        announce: []
+        announce
       }
     });
-    this.initListeners();
   }
   initListeners() {
     ipcMain.handle(IPC_CHANNEL.GET_FILES_BY_URL, async (_, torrentUrl) => {
@@ -188,16 +208,14 @@ class Downloader {
     torrentList.forEach(async (item) => {
       let t = await this.instance.get(item.magnetURI);
       if (t) {
-        this.selectFilesInTorrent(t, item.selectFiles);
-        t.resume();
-      } else {
-        t = this.instance.add(item.magnetURI, { path: options.downloadPath }, (torrent) => {
-          this.selectFilesInTorrent(torrent, item.selectFiles);
-          torrent.on("done", () => {
-            this.handleTorrentDone(torrent);
-          });
-        });
+        this.instance.remove(t);
       }
+      t = this.instance.add(item.magnetURI, { path: options.downloadPath }, (torrent) => {
+        this.selectFilesInTorrent(torrent, item.selectFiles);
+        torrent.on("done", () => {
+          this.handleTorrentDone(torrent);
+        });
+      });
       result.push(torrentToTaskInfo(t));
       this.downloadingTasks.push(t);
     });
@@ -219,7 +237,7 @@ function createWindow() {
     autoHideMenuBar: true,
     ...process.platform === "linux" ? { icon } : {},
     webPreferences: {
-      preload: join(__dirname, "../preload/index.js"),
+      preload: join(__dirname, "../preload/index.mjs"),
       sandbox: false
     }
   });

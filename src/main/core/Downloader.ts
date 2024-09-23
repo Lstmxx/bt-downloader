@@ -4,6 +4,7 @@ import { ipcMain } from "electron";
 import { IPC_CHANNEL } from "@shared/ipc";
 import { TaskInfo, GetFilesByUrlRes } from "@shared/type";
 import { torrentFileToFile, torrentToTaskInfo } from "../utils/transformer";
+import { getAnnounce } from "../utils/announce";
 
 // const torrentProgress = () => {};
 
@@ -40,7 +41,7 @@ const getTorrentFiles = async (instance: Webtorrent.Instance, torrentUrl: string
 };
 
 export class Downloader {
-  instance: Webtorrent.Instance;
+  instance!: Webtorrent.Instance;
   win: Electron.BrowserWindow;
 
   downloadingTasks: Webtorrent.Torrent[] = [];
@@ -48,12 +49,17 @@ export class Downloader {
 
   constructor(win: Electron.BrowserWindow) {
     this.win = win;
+    this.initWebtorrent();
+    this.initListeners();
+  }
+
+  async initWebtorrent() {
+    const announce = await getAnnounce();
     this.instance = new Webtorrent({
       tracker: {
-        announce: [],
+        announce,
       },
     });
-    this.initListeners();
   }
 
   initListeners() {
@@ -128,16 +134,15 @@ export class Downloader {
       let t = await this.instance.get(item.magnetURI);
 
       if (t) {
-        this.selectFilesInTorrent(t, item.selectFiles);
-        t.resume();
-      } else {
-        t = this.instance.add(item.magnetURI, { path: options.downloadPath }, (torrent) => {
-          this.selectFilesInTorrent(torrent, item.selectFiles);
-          torrent.on("done", () => {
-            this.handleTorrentDone(torrent);
-          });
-        });
+        this.instance.remove(t);
       }
+
+      t = this.instance.add(item.magnetURI, { path: options.downloadPath }, (torrent) => {
+        this.selectFilesInTorrent(torrent, item.selectFiles);
+        torrent.on("done", () => {
+          this.handleTorrentDone(torrent);
+        });
+      });
 
       result.push(torrentToTaskInfo(t));
       this.downloadingTasks.push(t);
