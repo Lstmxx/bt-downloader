@@ -1,9 +1,9 @@
-import { app, ipcMain, BrowserWindow, shell } from "electron";
+import { app, ipcMain, dialog, BrowserWindow, shell } from "electron";
 import path, { join } from "path";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import Store from "electron-store";
 import Webtorrent from "webtorrent";
-import fs from "node:fs";
+import fs, { promises } from "node:fs";
 import __cjs_mod__ from "node:module";
 const __filename = import.meta.filename;
 const __dirname = import.meta.dirname;
@@ -24,7 +24,10 @@ const IPC_CHANNEL = {
   GET_DOWNLOADING_TASKS: "downloader:get-downloading-tasks",
   START_DOWNLOAD: "downloader:start-download",
   TORRENT_DONE: "downloader:torrent-done",
-  GET_DONE_TASKS: "downloader:get-done-tasks"
+  GET_DONE_TASKS: "downloader:get-done-tasks",
+  PAUSE_TORRENT: "downloader:pause-torrent",
+  RESUME_TORRENT: "downloader:resume-torrent",
+  GET_FILES_BY_TORRENT_FILE: "downloader:get-files-by-torrent-file"
 };
 const IPC_CONFIG_CHANNEL = {
   GET_CONFIG: "config:get",
@@ -67,10 +70,11 @@ const torrentFileToFile = (files) => {
   return result;
 };
 const torrentPieceToPiece = (pieces) => {
+  if (!pieces) return [];
   const result = (pieces || []).map((piece) => {
     return {
-      length: piece?.length,
-      missing: piece?.missing
+      length: piece?.length || 0,
+      missing: piece?.missing || 0
     };
   });
   return result;
@@ -122,10 +126,22 @@ const getAnnounce = () => {
     });
   });
 };
-const getTorrentFiles = async (instance, torrentUrl) => {
-  return new Promise((resolve, reject) => {
-    console.log("add:", torrentUrl);
-    instance.add(torrentUrl, function(torrent) {
+const getFileDialog = async (filters, multi = false) => {
+  const properties = multi ? ["openFile", "multiSelections"] : ["openFile"];
+  const { filePaths } = await dialog.showOpenDialog({
+    properties,
+    filters
+  });
+  return filePaths;
+};
+const getTorrentFiles = async (instance, magnetURI) => {
+  return new Promise(async (resolve, reject) => {
+    const t = await instance.get(magnetURI);
+    if (t) {
+      instance.remove(t);
+    }
+    console.log("add:", magnetURI);
+    instance.add(magnetURI, function(torrent) {
       torrent.pause();
       console.log("torrent:", torrent);
       resolve({ files: torrent.files, torrent });
@@ -143,6 +159,7 @@ class Downloader {
   instance;
   win;
   downloadingTasks = [];
+  pausedTasks = [];
   doneTasks = [];
   constructor(win) {
     this.win = win;
@@ -158,8 +175,11 @@ class Downloader {
     });
   }
   initListeners() {
-    ipcMain.handle(IPC_CHANNEL.GET_FILES_BY_URL, async (_, torrentUrl) => {
-      return this.getFilesByUrl(torrentUrl);
+    ipcMain.handle(IPC_CHANNEL.GET_FILES_BY_URL, async (_, magnetURI) => {
+      return this.getFilesByUrl(magnetURI);
+    });
+    ipcMain.handle(IPC_CHANNEL.GET_FILES_BY_TORRENT_FILE, async () => {
+      return this.getFilesByTorrentFile();
     });
     ipcMain.handle(
       IPC_CHANNEL.START_DOWNLOAD,
@@ -173,10 +193,23 @@ class Downloader {
     ipcMain.handle(IPC_CHANNEL.GET_DONE_TASKS, () => {
       return this.getDoneTasks();
     });
+    ipcMain.handle(IPC_CHANNEL.PAUSE_TORRENT, (_, magnetURI) => {
+      this.pauseTorrent(magnetURI);
+    });
+    ipcMain.handle(IPC_CHANNEL.RESUME_TORRENT, (_, magnetURI) => {
+      this.resumeTorrent(magnetURI);
+    });
   }
-  async getFilesByUrl(torrentUrl) {
-    const { files, torrent } = await getTorrentFiles(this.instance, torrentUrl);
+  async getFilesByUrl(magnetURI) {
+    const { files, torrent } = await getTorrentFiles(this.instance, magnetURI);
     console.log(files);
+    return { files: torrentFileToFile(files), magnetURI: torrent.magnetURI };
+  }
+  async getFilesByTorrentFile() {
+    const [path2] = await getFileDialog([{ name: "Torrent", extensions: ["torrent"] }]);
+    if (!path2) return;
+    const data = await promises.readFile(path2);
+    const { files, torrent } = await getTorrentFiles(this.instance, data);
     return { files: torrentFileToFile(files), magnetURI: torrent.magnetURI };
   }
   handleTorrentDone(torrent) {
@@ -221,7 +254,26 @@ class Downloader {
     });
     return result;
   }
+  pauseTorrent(magnetURI) {
+    const t = this.instance.get(magnetURI);
+    if (t) {
+      t.pause();
+      this.downloadingTasks = this.downloadingTasks.filter((item) => item.magnetURI !== magnetURI);
+      this.pausedTasks.push(t);
+    }
+  }
+  resumeTorrent(magnetURI) {
+    const t = this.instance.get(magnetURI);
+    if (t) {
+      t.resume();
+      this.pausedTasks = this.pausedTasks.filter((item) => item.magnetURI !== magnetURI);
+      this.downloadingTasks.push(t);
+    }
+  }
   destroy() {
+    this.downloadingTasks.forEach((item) => {
+      item.pause();
+    });
     this.instance.destroy();
   }
 }
@@ -239,7 +291,8 @@ function createWindow() {
     webPreferences: {
       preload: join(__dirname, "../preload/index.mjs"),
       sandbox: false
-    }
+    },
+    title: "bt-downloader"
   });
   mainWindow.on("ready-to-show", () => {
     mainWindow.show();

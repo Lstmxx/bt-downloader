@@ -15,10 +15,11 @@ export const torrentFileToFile = (files: Webtorrent.TorrentFile[]) => {
 };
 
 const torrentPieceToPiece = (pieces: Array<Webtorrent.TorrentPiece | null>) => {
+  if (!pieces) return [];
   const result = (pieces || []).map((piece) => {
     return {
-      length: piece?.length,
-      missing: piece?.missing,
+      length: piece?.length || 0,
+      missing: piece?.missing || 0,
     };
   });
   return result;

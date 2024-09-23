@@ -2,7 +2,7 @@
 import { ref } from "vue";
 
 import Dialog from "primevue/dialog";
-import CreateByUrl from "./create-by-url.vue";
+import Create from "./create.vue";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Button from "primevue/button";
@@ -67,7 +67,7 @@ const handleStartDownload = async () => {
     <i class="pi pi-plus" @click="handleOpenDialog" />
     <Dialog v-model:visible="visible" modal header="新增种子任务" :style="{ width: '50rem' }" :closable="false">
       <div class="flex flex-col gap-4">
-        <CreateByUrl v-model:loading="loading" @success="handleGetFilesSuccess" />
+        <Create v-model:loading="loading" @success="handleGetFilesSuccess" />
         <DataTable
           ref="DataTableRef"
           v-model:selection="selectedFiles"

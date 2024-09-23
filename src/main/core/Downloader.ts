@@ -1,30 +1,26 @@
 import Webtorrent from "webtorrent";
+import { promises as fs } from "node:fs";
 import { ipcMain } from "electron";
 
 import { IPC_CHANNEL } from "@shared/ipc";
 import { TaskInfo, GetFilesByUrlRes } from "@shared/type";
 import { torrentFileToFile, torrentToTaskInfo } from "../utils/transformer";
 import { getAnnounce } from "../utils/announce";
+import { getFileDialog } from "./dialog";
 
 // const torrentProgress = () => {};
 
-const getTorrentFiles = async (instance: Webtorrent.Instance, torrentUrl: string) => {
-  return new Promise<{ files: Webtorrent.TorrentFile[]; torrent: Webtorrent.Torrent }>((resolve, reject) => {
-    // const t = instance.get(torrentUrl);
-    // if (t) {
-    //   if (t.files) {
-    //     resolve({ files: t.files, torrent: t });
-    //     return;
-    //   }
-    //   instance.remove(torrentUrl, {}, (err) => {
-    //     console.log('remove:', err);
-    //     reject(err);
-    //   });
-    // }
+const getTorrentFiles = async (instance: Webtorrent.Instance, magnetURI: string | Buffer) => {
+  return new Promise<{ files: Webtorrent.TorrentFile[]; torrent: Webtorrent.Torrent }>(async (resolve, reject) => {
+    const t = await instance.get(magnetURI);
 
-    console.log("add:", torrentUrl);
+    if (t) {
+      instance.remove(t);
+    }
 
-    instance.add(torrentUrl, function (torrent) {
+    console.log("add:", magnetURI);
+
+    instance.add(magnetURI, function (torrent) {
       torrent.pause();
       console.log("torrent:", torrent);
       resolve({ files: torrent.files, torrent });
@@ -45,6 +41,7 @@ export class Downloader {
   win: Electron.BrowserWindow;
 
   downloadingTasks: Webtorrent.Torrent[] = [];
+  pausedTasks: Webtorrent.Torrent[] = [];
   doneTasks: TaskInfo[] = [];
 
   constructor(win: Electron.BrowserWindow) {
@@ -63,9 +60,13 @@ export class Downloader {
   }
 
   initListeners() {
-    ipcMain.handle(IPC_CHANNEL.GET_FILES_BY_URL, async (_, torrentUrl: string): Promise<GetFilesByUrlRes> => {
-      return this.getFilesByUrl(torrentUrl);
+    ipcMain.handle(IPC_CHANNEL.GET_FILES_BY_URL, async (_, magnetURI: string): Promise<GetFilesByUrlRes> => {
+      return this.getFilesByUrl(magnetURI);
     });
+    ipcMain.handle(IPC_CHANNEL.GET_FILES_BY_TORRENT_FILE, async () => {
+      return this.getFilesByTorrentFile();
+    });
+
     ipcMain.handle(
       IPC_CHANNEL.START_DOWNLOAD,
       (
@@ -85,11 +86,30 @@ export class Downloader {
     ipcMain.handle(IPC_CHANNEL.GET_DONE_TASKS, () => {
       return this.getDoneTasks();
     });
+
+    ipcMain.handle(IPC_CHANNEL.PAUSE_TORRENT, (_, magnetURI: string) => {
+      this.pauseTorrent(magnetURI);
+    });
+
+    ipcMain.handle(IPC_CHANNEL.RESUME_TORRENT, (_, magnetURI: string) => {
+      this.resumeTorrent(magnetURI);
+    });
   }
 
-  async getFilesByUrl(torrentUrl: string): Promise<GetFilesByUrlRes> {
-    const { files, torrent } = await getTorrentFiles(this.instance, torrentUrl);
+  async getFilesByUrl(magnetURI: string): Promise<GetFilesByUrlRes> {
+    const { files, torrent } = await getTorrentFiles(this.instance, magnetURI);
     console.log(files);
+    return { files: torrentFileToFile(files), magnetURI: torrent.magnetURI };
+  }
+
+  async getFilesByTorrentFile() {
+    const [path] = await getFileDialog([{ name: "Torrent", extensions: ["torrent"] }]);
+    if (!path) return;
+
+    const data = await fs.readFile(path);
+
+    const { files, torrent } = await getTorrentFiles(this.instance, data);
+
     return { files: torrentFileToFile(files), magnetURI: torrent.magnetURI };
   }
 
@@ -151,7 +171,29 @@ export class Downloader {
     return result;
   }
 
+  pauseTorrent(magnetURI: string) {
+    const t = this.instance.get(magnetURI);
+    if (t) {
+      t.pause();
+      this.downloadingTasks = this.downloadingTasks.filter((item) => item.magnetURI !== magnetURI);
+      this.pausedTasks.push(t);
+    }
+  }
+
+  resumeTorrent(magnetURI: string) {
+    const t = this.instance.get(magnetURI);
+    if (t) {
+      t.resume();
+      this.pausedTasks = this.pausedTasks.filter((item) => item.magnetURI !== magnetURI);
+      this.downloadingTasks.push(t);
+    }
+  }
+
   destroy() {
+    this.downloadingTasks.forEach((item) => {
+      item.pause();
+    });
+
     this.instance.destroy();
   }
 }

@@ -5,6 +5,8 @@ import icon from "../../resources/icon.png?asset";
 import { SettingManage } from "./core/SettingManage";
 import { Downloader } from "./core/Downloader";
 
+import { initDialog } from "./core/dialog";
+
 let mainWindow: BrowserWindow;
 let downloader: Downloader;
 
@@ -22,6 +24,7 @@ function createWindow(): void {
       preload: join(__dirname, "../preload/index.mjs"),
       sandbox: false,
     },
+    title: "bt-downloader",
   });
 
   mainWindow.on("ready-to-show", () => {
@@ -68,6 +71,8 @@ app.whenReady().then(() => {
     downloader = new Downloader(mainWindow);
     console.log(downloader);
   }
+
+  initDialog();
 
   app.on("activate", function () {
     // On macOS it's common to re-create a window in the app when the

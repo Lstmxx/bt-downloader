@@ -30,7 +30,7 @@ export interface TaskInfo {
 
   ["announce-list"]: string[][];
 
-  pieces: Array<TorrentPiece | null>;
+  pieces: Array<TorrentPiece>;
 
   timeRemaining: number;
 
@@ -78,4 +78,9 @@ export interface TaskInfo {
 export interface GetFilesByUrlRes {
   files: TorrentFile[];
   magnetURI: string;
-};
+}
+
+export interface GetFilesByTorrentFileRes {
+  files: TorrentFile[];
+  magnetURI: string;
+}

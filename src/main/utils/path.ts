@@ -1,11 +1,11 @@
 import { app } from "electron";
 
 export const getUserDataPath = () => {
-  return app.getPath('userData');
+  return app.getPath("userData");
 };
 
 export const getDownloadPath = () => {
-  return app.getPath('downloads');
+  return app.getPath("downloads");
 };
 
 export const getConfigBasePath = () => {

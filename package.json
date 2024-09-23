@@ -31,6 +31,7 @@
     "electron-store": "8.2.0",
     "electron-updater": "^6.1.7",
     "knex": "^3.1.0",
+    "parse-torrent": "^11.0.17",
     "pinia": "^2.2.2",
     "primeicons": "^7.0.0",
     "primevue": "^4.0.4",

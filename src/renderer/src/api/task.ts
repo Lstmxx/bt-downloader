@@ -1,8 +1,13 @@
 import { IPC_CHANNEL } from "@shared/ipc";
-import { GetFilesByUrlRes, TaskInfo } from "@shared/type";
+import { GetFilesByTorrentFileRes, GetFilesByUrlRes, TaskInfo } from "@shared/type";
 
 export const getTorrentFilesByUrl = async (torrentUrl: string) => {
   const files = (await window.ipcRenderer.invoke(IPC_CHANNEL.GET_FILES_BY_URL, torrentUrl)) as GetFilesByUrlRes;
+  return files;
+};
+
+export const getTorrentFilesByFile = async () => {
+  const files = (await window.ipcRenderer.invoke(IPC_CHANNEL.GET_FILES_BY_TORRENT_FILE)) as GetFilesByTorrentFileRes;
   return files;
 };
 
