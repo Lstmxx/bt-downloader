@@ -5,7 +5,8 @@ import { formatBytes } from "@renderer/core/utils/format";
 
 import ProgressBar from "primevue/progressbar";
 import Divider from "primevue/divider";
-import FileList from "./file-list.vue";
+import FileList from "../file-list.vue";
+import { useHandler } from "./use-handler";
 
 const props = defineProps({
   task: {
@@ -40,6 +41,8 @@ const progressValueCls = computed(() => {
   }
   return "!bg-blue";
 });
+
+const { handleDelete, handlePause, handleResume } = useHandler(props);
 </script>
 
 <template>
@@ -47,9 +50,9 @@ const progressValueCls = computed(() => {
     <div class="flex justify-between items-center">
       <span class="flex-1 text-wrap font-bold text-primary-600">{{ task.name }}</span>
       <div class="flex gap-2">
-        <i v-if="task.paused" class="pi pi-play cursor-pointer" />
-        <i v-else class="pi pi-pause cursor-pointer" />
-        <i class="pi pi-times cursor-pointer" />
+        <i v-if="task.paused" class="pi pi-play cursor-pointer" @click="handleResume" />
+        <i v-else class="pi pi-pause cursor-pointer" @click="handlePause" />
+        <i class="pi pi-times cursor-pointer" @click="handleDelete" />
       </div>
     </div>
     <div class="flex flex-col gap-2">

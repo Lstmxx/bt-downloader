@@ -7,6 +7,8 @@ export const IPC_CHANNEL = {
   PAUSE_TORRENT: "downloader:pause-torrent",
   RESUME_TORRENT: "downloader:resume-torrent",
   GET_FILES_BY_TORRENT_FILE: "downloader:get-files-by-torrent-file",
+  GET_PAUSED_TASKS: "downloader:get-paused-tasks",
+  DELETE_TORRENT: "downloader:delete-torrent",
 };
 
 export const IPC_DIALOG_CHANNEL = {

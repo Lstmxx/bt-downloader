@@ -1,6 +1,6 @@
 import Webtorrent from "webtorrent";
 import { promises as fs } from "node:fs";
-import { ipcMain } from "electron";
+import { ipcMain, Notification } from "electron";
 
 import { IPC_CHANNEL } from "@shared/ipc";
 import { TaskInfo, GetFilesByUrlRes } from "@shared/type";
@@ -80,11 +80,15 @@ export class Downloader {
         return this.startDownload(torrentList, options);
       },
     );
+
     ipcMain.handle(IPC_CHANNEL.GET_DOWNLOADING_TASKS, () => {
       return this.getDownloadingTasks();
     });
     ipcMain.handle(IPC_CHANNEL.GET_DONE_TASKS, () => {
       return this.getDoneTasks();
+    });
+    ipcMain.handle(IPC_CHANNEL.GET_PAUSED_TASKS, () => {
+      return this.getPausedTasks();
     });
 
     ipcMain.handle(IPC_CHANNEL.PAUSE_TORRENT, (_, magnetURI: string) => {
@@ -93,6 +97,9 @@ export class Downloader {
 
     ipcMain.handle(IPC_CHANNEL.RESUME_TORRENT, (_, magnetURI: string) => {
       this.resumeTorrent(magnetURI);
+    });
+    ipcMain.handle(IPC_CHANNEL.DELETE_TORRENT, (_, magnetURI: string) => {
+      this.deleteTorrent(magnetURI);
     });
   }
 
@@ -121,6 +128,7 @@ export class Downloader {
       this.doneTasks.push(torrentToTaskInfo(torrent));
     }
     this.win.webContents.send(IPC_CHANNEL.TORRENT_DONE, magnetURI);
+    new Notification({ title: torrent.name, body: "下载完成" }).show();
   }
 
   selectFilesInTorrent(torrent: Webtorrent.Torrent, selectFiles: string[]) {
@@ -139,6 +147,10 @@ export class Downloader {
 
   getDoneTasks() {
     return this.doneTasks;
+  }
+
+  getPausedTasks() {
+    return this.pausedTasks.map(torrentToTaskInfo);
   }
 
   startDownload(
@@ -186,6 +198,14 @@ export class Downloader {
       t.resume();
       this.pausedTasks = this.pausedTasks.filter((item) => item.magnetURI !== magnetURI);
       this.downloadingTasks.push(t);
+    }
+  }
+
+  deleteTorrent(magnetURI: string) {
+    const t = this.instance.get(magnetURI);
+    if (t) {
+      t.pause();
+      this.instance.remove(t);
     }
   }
 
