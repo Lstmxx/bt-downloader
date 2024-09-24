@@ -15,7 +15,7 @@ module.exports = {
     "vue/multi-word-component-names": "off",
     strict: "off",
     semi: ["error", "always"], // Enforce semicolons at the end of statements
-    indent: ["error", 2], // Enforce 2-space indentation
+    indent: ["error", 2, { SwitchCase: 1, ignoredNodes: ["PropertyDefinition"] }],
     "no-unused-vars": "warn",
     "lines-between-class-members": "off",
     "comma-dangle": ["error", "only-multiline"],

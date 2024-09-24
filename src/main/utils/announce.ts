@@ -12,7 +12,6 @@ export const getAnnounce = (): Promise<string[]> => {
         reject(err);
       } else {
         const dataList = data.split("\n").filter((line) => line.trim() !== "");
-        console.log("dataList", dataList);
         resolve(dataList);
       }
     });

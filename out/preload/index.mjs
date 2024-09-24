@@ -46,4 +46,3 @@ contextBridge.exposeInMainWorld("ipcRenderer", {
   // You can expose other APTs you need here.
   // ...
 });
-//# sourceMappingURL=index.mjs.map

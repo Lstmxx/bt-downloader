@@ -41,9 +41,15 @@ export const useList = () => {
     fn();
   };
 
-  watch(currentStatus, (status) => {
-    updateTaskInfos(status);
-  });
+  watch(
+    currentStatus,
+    (status) => {
+      updateTaskInfos(status);
+    },
+    {
+      immediate: true,
+    },
+  );
 
   const handleTorrentDone = () => {
     updateTaskInfos(currentStatus.value);

@@ -4,6 +4,7 @@ import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import Store from "electron-store";
 import Webtorrent from "webtorrent";
 import fs, { promises } from "node:fs";
+import { PrimaryColumn, Column, OneToMany, Entity, ManyToOne, DataSource } from "typeorm";
 import __cjs_mod__ from "node:module";
 const __filename = import.meta.filename;
 const __dirname = import.meta.dirname;
@@ -125,7 +126,6 @@ const getAnnounce = () => {
         reject(err);
       } else {
         const dataList = data.split("\n").filter((line) => line.trim() !== "");
-        console.log("dataList", dataList);
         resolve(dataList);
       }
     });
@@ -286,16 +286,16 @@ class Downloader {
       this.pausedTasks.push(t);
     }
   }
-  resumeTorrent(magnetURI) {
-    const t = this.instance.get(magnetURI);
+  async resumeTorrent(magnetURI) {
+    const t = await this.instance.get(magnetURI);
     if (t) {
       t.resume();
       this.pausedTasks = this.pausedTasks.filter((item) => item.magnetURI !== magnetURI);
       this.downloadingTasks.push(t);
     }
   }
-  deleteTorrent(magnetURI) {
-    const t = this.instance.get(magnetURI);
+  async deleteTorrent(magnetURI) {
+    const t = await this.instance.get(magnetURI);
     if (t) {
       t.pause();
       this.instance.remove(t);
@@ -308,6 +308,161 @@ class Downloader {
     this.instance.destroy();
   }
 }
+var TaskStatus = /* @__PURE__ */ ((TaskStatus2) => {
+  TaskStatus2["Pending"] = "Pending";
+  TaskStatus2["InProgress"] = "InProgress";
+  TaskStatus2["Completed"] = "Completed";
+  TaskStatus2["Failed"] = "Failed";
+  return TaskStatus2;
+})(TaskStatus || {});
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __decorateClass = (decorators, target, key, kind) => {
+  var result = kind > 1 ? void 0 : kind ? __getOwnPropDesc(target, key) : target;
+  for (var i = decorators.length - 1, decorator; i >= 0; i--)
+    if (decorator = decorators[i])
+      result = (kind ? decorator(target, key, result) : decorator(result)) || result;
+  if (kind && result) __defProp(target, key, result);
+  return result;
+};
+let TaskModel = class {
+  id;
+  infoHash;
+  magnetURI;
+  status;
+  path;
+  name;
+  files;
+};
+__decorateClass([
+  PrimaryColumn({ type: "int" })
+], TaskModel.prototype, "id", 2);
+__decorateClass([
+  Column({ type: "text", nullable: false })
+], TaskModel.prototype, "infoHash", 2);
+__decorateClass([
+  Column({ type: "text", nullable: false })
+], TaskModel.prototype, "magnetURI", 2);
+__decorateClass([
+  Column({ type: "text", enum: TaskStatus, default: TaskStatus.Pending, nullable: false })
+], TaskModel.prototype, "status", 2);
+__decorateClass([
+  Column({ type: "text", nullable: false })
+], TaskModel.prototype, "path", 2);
+__decorateClass([
+  Column({ type: "text", nullable: false })
+], TaskModel.prototype, "name", 2);
+__decorateClass([
+  OneToMany(() => FileModel, (file) => file.task)
+], TaskModel.prototype, "files", 2);
+TaskModel = __decorateClass([
+  Entity()
+], TaskModel);
+let FileModel = class {
+  id;
+  name;
+  length;
+  isSelected;
+  path;
+  isDownloaded;
+  task;
+};
+__decorateClass([
+  PrimaryColumn({ type: "int" })
+], FileModel.prototype, "id", 2);
+__decorateClass([
+  Column({ type: "text", nullable: false })
+], FileModel.prototype, "name", 2);
+__decorateClass([
+  Column({ type: "bigint", nullable: false })
+], FileModel.prototype, "length", 2);
+__decorateClass([
+  Column({ type: "boolean", nullable: false })
+], FileModel.prototype, "isSelected", 2);
+__decorateClass([
+  Column({ type: "text", nullable: false })
+], FileModel.prototype, "path", 2);
+__decorateClass([
+  Column({ type: "boolean", nullable: false })
+], FileModel.prototype, "isDownloaded", 2);
+__decorateClass([
+  ManyToOne(() => TaskModel, (task) => task.files)
+], FileModel.prototype, "task", 2);
+FileModel = __decorateClass([
+  Entity()
+], FileModel);
+class DataBase {
+  dataSource;
+  //初始化数据库文件
+  constructor(database) {
+    const basePath = path.join(app.getPath("appData"), app.getName(), `./${database}.sql`);
+    const options = {
+      type: "better-sqlite3",
+      entities: [TaskModel, FileModel],
+      database: basePath,
+      synchronize: true
+    };
+    this.dataSource = new DataSource(options);
+    console.log("db_path", basePath, this.dataSource);
+  }
+  close() {
+    this.dataSource.destroy();
+  }
+}
+const DB_NAME = "DATA";
+const db = new DataBase(DB_NAME);
+class TaskService {
+  static instance;
+  dataSource;
+  //使用单例模式
+  static getInstance() {
+    if (!this.instance) {
+      this.instance = new TaskService();
+    }
+    return this.instance;
+  }
+  constructor() {
+    this.dataSource = db.dataSource;
+    this.dataSource.initialize();
+    this.init();
+  }
+  //初始化主角进程监听事件
+  init() {
+    ipcMain.handle("create-task", async (_, data) => {
+      const task = new TaskModel();
+      Object.keys(data.task).forEach((key) => {
+        task[key] = data.task[key];
+      });
+      const res = await this.create(task);
+      return res;
+    });
+  }
+  //实现新增方法
+  async create(task) {
+    await this.dataSource.initialize();
+    const res = await this.dataSource.manager.save(task);
+    await this.dataSource.destroy();
+    return res;
+  }
+  //实现分页查询
+  async getList(options) {
+    await this.dataSource.initialize();
+    const skip = options.pageSize * options.pageNum - options.pageSize;
+    const sort = options.sort === 2 ? "ASC" : "DESC";
+    const listAndCount = await this.dataSource.createQueryBuilder(TaskModel, "task").orderBy("task.id", sort).skip(skip).take(options.pageSize).getManyAndCount();
+    await this.dataSource.destroy();
+    return { list: listAndCount[0], count: listAndCount[1] };
+  }
+}
+const initService = () => {
+  console.log("Service initialized");
+  new TaskService();
+};
+const closeService = () => {
+  console.log("Service closed");
+  db.close();
+};
+initService();
 let mainWindow;
 let downloader;
 function createWindow() {
@@ -363,5 +518,5 @@ app.on("window-all-closed", () => {
   if (downloader) {
     downloader.destroy();
   }
+  closeService();
 });
-//# sourceMappingURL=index.js.map

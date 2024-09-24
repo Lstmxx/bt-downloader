@@ -6,6 +6,9 @@ import { SettingManage } from "./core/SettingManage";
 import { Downloader } from "./core/Downloader";
 
 import { initDialog } from "./core/dialog";
+import { initService, closeService } from "./core/service";
+
+initService();
 
 let mainWindow: BrowserWindow;
 let downloader: Downloader;
@@ -91,6 +94,7 @@ app.on("window-all-closed", () => {
   if (downloader) {
     downloader.destroy();
   }
+  closeService();
 });
 
 // In this file you can include the rest of your app"s specific main process
