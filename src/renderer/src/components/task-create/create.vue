@@ -41,7 +41,6 @@ const handleGetByFile = async () => {
   try {
     const { files, magnetURI } = await getTorrentFilesByFile();
     url.value = magnetURI;
-    console.log("render", files);
     emit("success", { files, magnetURI });
   } catch (error) {
     console.error(error);

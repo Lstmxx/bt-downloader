@@ -2,7 +2,7 @@
 import { PropType } from "vue";
 import { TaskInfo } from "@shared/type";
 
-import TaskItem from "./task-item.vue";
+import TaskItem from "./task-item/index.vue";
 
 import ScrollPanel from "primevue/scrollpanel";
 

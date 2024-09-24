@@ -17,31 +17,32 @@ export const useList = () => {
     taskInfos.value = await getPausedTasks();
   };
 
-  const getTaskFnMap = {
-    [TASK_STATUS.DONE]: handleGetDoneTasks,
-    [TASK_STATUS.PAUSED]: handleGetPausedTasks,
-    [TASK_STATUS.DOWNLOADING]: null,
-  };
-
-  const updateTaskInfos = (status: TASK_STATUS) => {
-    const fn = getTaskFnMap[status];
-    if (fn) {
-      fn();
-    }
-  };
-
-  watch(currentStatus, (status) => {
-    updateTaskInfos(status);
-  });
-
   const { startLoop, stopLoop } = useLoopGetDownloadingTasksInfo({
     handleSuccess(result) {
       console.log("loop", result);
-      taskInfos.value = result;
+      if (currentStatus.value === TASK_STATUS.DOWNLOADING) {
+        taskInfos.value = result;
+      }
     },
     handleError() {
       console.error("获取任务列表失败");
     },
+  });
+
+  const getTaskFnMap = {
+    [TASK_STATUS.DONE]: handleGetDoneTasks,
+    [TASK_STATUS.PAUSED]: handleGetPausedTasks,
+    [TASK_STATUS.DOWNLOADING]: startLoop,
+  };
+
+  const updateTaskInfos = (status: TASK_STATUS) => {
+    stopLoop();
+    const fn = getTaskFnMap[status];
+    fn();
+  };
+
+  watch(currentStatus, (status) => {
+    updateTaskInfos(status);
   });
 
   const handleTorrentDone = () => {
@@ -50,7 +51,6 @@ export const useList = () => {
 
   onMounted(() => {
     window.api.onTorrentDone(handleTorrentDone);
-    startLoop();
   });
 
   onUnmounted(() => {

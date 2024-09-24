@@ -13,7 +13,7 @@ const { currentStatus, taskInfos } = useList();
 
 <template>
   <div class="flex flex-col w-full h-full py-4 px-4">
-    <Tabs v-model="currentStatus" :scrollable="true">
+    <Tabs v-model:value="currentStatus" :scrollable="true">
       <TabList>
         <Tab v-for="status in TASK_STATUS_LIST" :key="status.value" :value="status.value">
           {{ status.label }}

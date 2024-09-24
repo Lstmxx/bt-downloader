@@ -1,4 +1,4 @@
-import { app, ipcMain, dialog, BrowserWindow, shell } from "electron";
+import { app, ipcMain, dialog, Notification, BrowserWindow, shell } from "electron";
 import path, { join } from "path";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import Store from "electron-store";
@@ -27,7 +27,12 @@ const IPC_CHANNEL = {
   GET_DONE_TASKS: "downloader:get-done-tasks",
   PAUSE_TORRENT: "downloader:pause-torrent",
   RESUME_TORRENT: "downloader:resume-torrent",
-  GET_FILES_BY_TORRENT_FILE: "downloader:get-files-by-torrent-file"
+  GET_FILES_BY_TORRENT_FILE: "downloader:get-files-by-torrent-file",
+  GET_PAUSED_TASKS: "downloader:get-paused-tasks",
+  DELETE_TORRENT: "downloader:delete-torrent"
+};
+const IPC_DIALOG_CHANNEL = {
+  GET_DICT_PATH: "dialog:get-dict-path"
 };
 const IPC_CONFIG_CHANNEL = {
   GET_CONFIG: "config:get",
@@ -126,6 +131,13 @@ const getAnnounce = () => {
     });
   });
 };
+const getPathDialog = async (_, defaultPath) => {
+  const { filePaths } = await dialog.showOpenDialog({
+    properties: ["openDirectory"],
+    defaultPath
+  });
+  return filePaths;
+};
 const getFileDialog = async (filters, multi = false) => {
   const properties = multi ? ["openFile", "multiSelections"] : ["openFile"];
   const { filePaths } = await dialog.showOpenDialog({
@@ -133,6 +145,9 @@ const getFileDialog = async (filters, multi = false) => {
     filters
   });
   return filePaths;
+};
+const initDialog = () => {
+  ipcMain.handle(IPC_DIALOG_CHANNEL.GET_DICT_PATH, getPathDialog);
 };
 const getTorrentFiles = async (instance, magnetURI) => {
   return new Promise(async (resolve, reject) => {
@@ -193,16 +208,21 @@ class Downloader {
     ipcMain.handle(IPC_CHANNEL.GET_DONE_TASKS, () => {
       return this.getDoneTasks();
     });
+    ipcMain.handle(IPC_CHANNEL.GET_PAUSED_TASKS, () => {
+      return this.getPausedTasks();
+    });
     ipcMain.handle(IPC_CHANNEL.PAUSE_TORRENT, (_, magnetURI) => {
       this.pauseTorrent(magnetURI);
     });
     ipcMain.handle(IPC_CHANNEL.RESUME_TORRENT, (_, magnetURI) => {
       this.resumeTorrent(magnetURI);
     });
+    ipcMain.handle(IPC_CHANNEL.DELETE_TORRENT, (_, magnetURI) => {
+      this.deleteTorrent(magnetURI);
+    });
   }
   async getFilesByUrl(magnetURI) {
     const { files, torrent } = await getTorrentFiles(this.instance, magnetURI);
-    console.log(files);
     return { files: torrentFileToFile(files), magnetURI: torrent.magnetURI };
   }
   async getFilesByTorrentFile() {
@@ -220,6 +240,7 @@ class Downloader {
       this.doneTasks.push(torrentToTaskInfo(torrent));
     }
     this.win.webContents.send(IPC_CHANNEL.TORRENT_DONE, magnetURI);
+    new Notification({ title: torrent.name, body: "下载完成" }).show();
   }
   selectFilesInTorrent(torrent, selectFiles) {
     torrent.files.forEach((file) => {
@@ -235,6 +256,9 @@ class Downloader {
   }
   getDoneTasks() {
     return this.doneTasks;
+  }
+  getPausedTasks() {
+    return this.pausedTasks.map(torrentToTaskInfo);
   }
   startDownload(torrentList, options) {
     const result = [];
@@ -254,8 +278,8 @@ class Downloader {
     });
     return result;
   }
-  pauseTorrent(magnetURI) {
-    const t = this.instance.get(magnetURI);
+  async pauseTorrent(magnetURI) {
+    const t = await this.instance.get(magnetURI);
     if (t) {
       t.pause();
       this.downloadingTasks = this.downloadingTasks.filter((item) => item.magnetURI !== magnetURI);
@@ -268,6 +292,13 @@ class Downloader {
       t.resume();
       this.pausedTasks = this.pausedTasks.filter((item) => item.magnetURI !== magnetURI);
       this.downloadingTasks.push(t);
+    }
+  }
+  deleteTorrent(magnetURI) {
+    const t = this.instance.get(magnetURI);
+    if (t) {
+      t.pause();
+      this.instance.remove(t);
     }
   }
   destroy() {
@@ -320,6 +351,7 @@ app.whenReady().then(() => {
     downloader = new Downloader(mainWindow);
     console.log(downloader);
   }
+  initDialog();
   app.on("activate", function() {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -332,3 +364,4 @@ app.on("window-all-closed", () => {
     downloader.destroy();
   }
 });
+//# sourceMappingURL=index.js.map

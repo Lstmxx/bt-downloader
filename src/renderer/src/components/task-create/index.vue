@@ -2,10 +2,10 @@
 import { ref } from "vue";
 
 import Dialog from "primevue/dialog";
-import Create from "./create.vue";
 import DataTable from "primevue/datatable";
 import Column from "primevue/column";
 import Button from "primevue/button";
+import Create from "./create.vue";
 import PathSelect from "../path-select.vue";
 
 import { TorrentFile } from "@shared/type";

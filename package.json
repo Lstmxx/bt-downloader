@@ -30,12 +30,10 @@
     "@types/webtorrent": "^0.109.8",
     "electron-store": "8.2.0",
     "electron-updater": "^6.1.7",
-    "knex": "^3.1.0",
     "lodash-es": "^4.17.21",
     "pinia": "^2.2.2",
     "primeicons": "^7.0.0",
     "primevue": "^4.0.4",
-    "sqlite3": "^5.1.7",
     "tailwindcss-primeui": "^0.3.4",
     "vue-router": "4",
     "webtorrent": "^2.5.0"

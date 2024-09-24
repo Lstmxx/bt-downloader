@@ -105,7 +105,6 @@ export class Downloader {
 
   async getFilesByUrl(magnetURI: string): Promise<GetFilesByUrlRes> {
     const { files, torrent } = await getTorrentFiles(this.instance, magnetURI);
-    console.log(files);
     return { files: torrentFileToFile(files), magnetURI: torrent.magnetURI };
   }
 
@@ -183,8 +182,8 @@ export class Downloader {
     return result;
   }
 
-  pauseTorrent(magnetURI: string) {
-    const t = this.instance.get(magnetURI);
+  async pauseTorrent(magnetURI: string) {
+    const t = await this.instance.get(magnetURI);
     if (t) {
       t.pause();
       this.downloadingTasks = this.downloadingTasks.filter((item) => item.magnetURI !== magnetURI);
@@ -192,8 +191,8 @@ export class Downloader {
     }
   }
 
-  resumeTorrent(magnetURI: string) {
-    const t = this.instance.get(magnetURI);
+  async resumeTorrent(magnetURI: string) {
+    const t = await this.instance.get(magnetURI);
     if (t) {
       t.resume();
       this.pausedTasks = this.pausedTasks.filter((item) => item.magnetURI !== magnetURI);
@@ -201,8 +200,8 @@ export class Downloader {
     }
   }
 
-  deleteTorrent(magnetURI: string) {
-    const t = this.instance.get(magnetURI);
+  async deleteTorrent(magnetURI: string) {
+    const t = await this.instance.get(magnetURI);
     if (t) {
       t.pause();
       this.instance.remove(t);
