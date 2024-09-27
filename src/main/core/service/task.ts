@@ -5,7 +5,7 @@ import { db } from "../db";
 import { TaskModel } from "../db/model";
 
 //创建数据查询Modal
-export interface MsgListDTO extends ListDTO {}
+export interface TaskListDTO extends ListDTO {}
 //列表查询基类
 export interface ListDTO {
   pageNum: number;
@@ -56,7 +56,7 @@ export class TaskService {
   }
 
   //实现分页查询
-  async getList(options: MsgListDTO) {
+  async getList(options: TaskListDTO) {
     await this.dataSource.initialize();
     const skip = options.pageSize * options.pageNum - options.pageSize;
     const sort = options.sort === 2 ? "ASC" : "DESC";
@@ -68,5 +68,8 @@ export class TaskService {
       .getManyAndCount();
     await this.dataSource.destroy();
     return { list: listAndCount[0], count: listAndCount[1] };
+  }
+  close() {
+    console.log("TaskService closed");
   }
 }

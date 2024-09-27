@@ -1,12 +1,19 @@
 import { db } from "../db";
-import { TaskService } from "./task";
+import { DownloaderService } from "./Downloader";
+import { TaskService } from "./Task";
 
-export const initService = () => {
+let taskService: TaskService;
+let downloaderService: DownloaderService;
+
+export const initService = (win: Electron.BrowserWindow) => {
   console.log("Service initialized");
-  new TaskService();
+  taskService = new TaskService();
+  downloaderService = new DownloaderService(win);
 };
 
 export const closeService = () => {
   console.log("Service closed");
+  taskService.close();
+  downloaderService.close();
   db.close();
 };

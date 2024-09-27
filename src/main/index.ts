@@ -3,15 +3,10 @@ import { join } from "path";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import icon from "../../resources/icon.png?asset";
 import { SettingManage } from "./core/SettingManage";
-import { Downloader } from "./core/Downloader";
-
 import { initDialog } from "./core/dialog";
-import { initService, closeService } from "./core/service";
-
-initService();
+import { closeService, initService } from "./core/service";
 
 let mainWindow: BrowserWindow;
-let downloader: Downloader;
 
 function createWindow(): void {
   // Create the browser window.
@@ -70,10 +65,7 @@ app.whenReady().then(() => {
   const settingManage = new SettingManage();
   console.log(settingManage);
 
-  if (mainWindow) {
-    downloader = new Downloader(mainWindow);
-    console.log(downloader);
-  }
+  initService(mainWindow);
 
   initDialog();
 
@@ -90,9 +82,6 @@ app.whenReady().then(() => {
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
-  }
-  if (downloader) {
-    downloader.destroy();
   }
   closeService();
 });

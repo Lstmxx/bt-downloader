@@ -1,6 +1,6 @@
 import Webtorrent from "webtorrent";
 import { promises as fs } from "node:fs";
-import { ipcMain, Notification } from "electron";
+import { Notification } from "electron";
 
 import { IPC_CHANNEL } from "@shared/ipc";
 import { TaskInfo, GetFilesByUrlRes } from "@shared/type";
@@ -47,7 +47,6 @@ export class Downloader {
   constructor(win: Electron.BrowserWindow) {
     this.win = win;
     this.initWebtorrent();
-    this.initListeners();
   }
 
   async initWebtorrent() {
@@ -56,50 +55,6 @@ export class Downloader {
       tracker: {
         announce,
       },
-    });
-  }
-
-  initListeners() {
-    ipcMain.handle(IPC_CHANNEL.GET_FILES_BY_URL, async (_, magnetURI: string): Promise<GetFilesByUrlRes> => {
-      return this.getFilesByUrl(magnetURI);
-    });
-    ipcMain.handle(IPC_CHANNEL.GET_FILES_BY_TORRENT_FILE, async () => {
-      return this.getFilesByTorrentFile();
-    });
-
-    ipcMain.handle(
-      IPC_CHANNEL.START_DOWNLOAD,
-      (
-        _,
-        torrentList: {
-          magnetURI: string;
-          selectFiles: string[];
-        }[],
-        options: { downloadPath?: string },
-      ) => {
-        return this.startDownload(torrentList, options);
-      },
-    );
-
-    ipcMain.handle(IPC_CHANNEL.GET_DOWNLOADING_TASKS, () => {
-      return this.getDownloadingTasks();
-    });
-    ipcMain.handle(IPC_CHANNEL.GET_DONE_TASKS, () => {
-      return this.getDoneTasks();
-    });
-    ipcMain.handle(IPC_CHANNEL.GET_PAUSED_TASKS, () => {
-      return this.getPausedTasks();
-    });
-
-    ipcMain.handle(IPC_CHANNEL.PAUSE_TORRENT, (_, magnetURI: string) => {
-      this.pauseTorrent(magnetURI);
-    });
-
-    ipcMain.handle(IPC_CHANNEL.RESUME_TORRENT, (_, magnetURI: string) => {
-      this.resumeTorrent(magnetURI);
-    });
-    ipcMain.handle(IPC_CHANNEL.DELETE_TORRENT, (_, magnetURI: string) => {
-      this.deleteTorrent(magnetURI);
     });
   }
 
