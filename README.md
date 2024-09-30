@@ -6,10 +6,10 @@
 
 ## 技术栈
 
-框架：electron + vite + Vue3 + Typescript
-持久化 pinia
-磁力链下载：webtorrent
-UI：TailwindCSS PrimeVue
+- 框架：electron + vite + Vue3 + Typescript
+- 持久化 pinia
+- 磁力链下载：webtorrent
+- UI：TailwindCSS PrimeVue
 
 ## 开发
 
