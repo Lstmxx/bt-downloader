@@ -58,7 +58,7 @@ const { handleDelete, handlePause, handleResume } = useHandler(props);
     <div class="flex flex-col gap-2">
       <ProgressBar :value="progress" :pt:value:class="progressValueCls" />
       <div class="flex justify-between items-center gap-4">
-        <div class="flex items-center gap-4">
+        <div v-if="!(task.done || task.paused)" class="flex items-center gap-4">
           <div class="text-success flex items-center gap-2">
             <i class="pi pi-arrow-down" />
             <span>

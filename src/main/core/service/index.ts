@@ -1,6 +1,6 @@
 import { db } from "../db";
 import { DownloaderService } from "./Downloader";
-import { TaskService } from "./Task";
+import { TaskService } from "../db/Task";
 
 let taskService: TaskService;
 let downloaderService: DownloaderService;

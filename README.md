@@ -1,12 +1,17 @@
 # bt-downloader
 
-An Electron application with Vue and TypeScript
+一个基于webtorrent的磁力链下载器
 
-## Recommended IDE Setup
+![bt-downloader](https://raw.githubusercontent.com/Lstmxx/picx-images-hosting/refs/heads/master/20240930/image.7p9k40yvq.png)
 
-- [VSCode](https://code.visualstudio.com/) + [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) + [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) + [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin)
+## 技术栈
 
-## Project Setup
+框架：electron + vite + Vue3 + Typescript
+持久化 pinia
+磁力链下载：webtorrent
+UI：TailwindCSS PrimeVue
+
+## 开发
 
 ### Install
 

@@ -1,8 +1,9 @@
 // src\main\service\TaskService.ts
 import { ipcMain } from "electron";
 import { DataSource } from "typeorm";
-import { db } from "../db";
-import { TaskModel } from "../db/model";
+import { db } from "./index";
+import { TaskModel } from "./model";
+import { DB_IPC_CHANNEL } from "@shared/ipc";
 
 //创建数据查询Modal
 export interface TaskListDTO extends ListDTO {}
@@ -29,14 +30,13 @@ export class TaskService {
   constructor() {
     //创建数据库
     this.dataSource = db.dataSource;
-    this.dataSource.initialize();
     this.init();
   }
 
   //初始化主角进程监听事件
   init() {
     //新增数据监听
-    ipcMain.handle("create-task", async (_, data: { task: TaskModel }) => {
+    ipcMain.handle(DB_IPC_CHANNEL.CREATE_TASK, async (_, data: { task: TaskModel }) => {
       const task = new TaskModel();
       Object.keys(data.task).forEach((key) => {
         task[key] = data.task[key];
@@ -55,21 +55,29 @@ export class TaskService {
     return res;
   }
 
+  async update(task: TaskModel) {
+    await this.dataSource.initialize();
+    const res = await this.dataSource.manager.save(task);
+    await this.dataSource.destroy();
+    return res;
+  }
+
   //实现分页查询
   async getList(options: TaskListDTO) {
     await this.dataSource.initialize();
-    const skip = options.pageSize * options.pageNum - options.pageSize;
+    // const skip = options.pageSize * options.pageNum - options.pageSize;
     const sort = options.sort === 2 ? "ASC" : "DESC";
     const listAndCount = await this.dataSource
       .createQueryBuilder(TaskModel, "task")
-      .orderBy("task.id", sort)
-      .skip(skip)
+      .orderBy("task.createTime", sort)
+      // .skip(skip)
       .take(options.pageSize)
       .getManyAndCount();
     await this.dataSource.destroy();
     return { list: listAndCount[0], count: listAndCount[1] };
   }
   close() {
+    this.dataSource.destroy();
     console.log("TaskService closed");
   }
 }

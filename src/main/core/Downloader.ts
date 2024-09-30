@@ -107,6 +107,10 @@ export class Downloader {
     return this.pausedTasks.map(torrentToTaskInfo);
   }
 
+  handleTorrentProgressUpdate(torrent: Webtorrent.Torrent) {
+    console.log(`${torrent.name} progress:`, torrent.progress);
+  }
+
   startDownload(
     torrentList: {
       magnetURI: string;

@@ -11,6 +11,10 @@ export const IPC_CHANNEL = {
   DELETE_TORRENT: "downloader:delete-torrent",
 };
 
+export const DB_IPC_CHANNEL = {
+  CREATE_TASK: "db:create-task",
+};
+
 export const IPC_DIALOG_CHANNEL = {
   GET_DICT_PATH: "dialog:get-dict-path",
 };

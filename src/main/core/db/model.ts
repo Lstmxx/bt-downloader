@@ -15,6 +15,9 @@ export class TaskModel {
   @Column({ type: "text", enum: TaskStatus, default: TaskStatus.Pending, nullable: false })
   status: string;
 
+  @Column({ type: "date", nullable: false })
+  createTime: Date;
+
   @Column({ type: "text", nullable: false })
   path: string;
 
