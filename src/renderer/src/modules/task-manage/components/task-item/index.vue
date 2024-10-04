@@ -7,6 +7,7 @@ import ProgressBar from "primevue/progressbar";
 import Divider from "primevue/divider";
 import FileList from "../file-list.vue";
 import { useHandler } from "./use-handler";
+import { TASK_STATUS } from "@shared/enum";
 
 const props = defineProps({
   task: {
@@ -31,12 +32,20 @@ const progress = computed(() => {
   return (props.task.progress * 100).toFixed(0);
 });
 
+const isPaused = computed(() => {
+  return props.task.status === TASK_STATUS.PAUSED;
+});
+
+const isDone = computed(() => {
+  return props.task.status === TASK_STATUS.DONE;
+});
+
 const progressValueCls = computed(() => {
-  if (props.task.done) {
+  if (isPaused.value) {
     return "!bg-success";
   }
 
-  if (props.task.paused) {
+  if (isDone.value) {
     return "!bg-warning";
   }
   return "!bg-blue";
@@ -50,7 +59,7 @@ const { handleDelete, handlePause, handleResume } = useHandler(props);
     <div class="flex justify-between items-center">
       <span class="flex-1 text-wrap font-bold text-primary-600">{{ task.name }}</span>
       <div class="flex gap-2">
-        <i v-if="task.paused" class="pi pi-play cursor-pointer" @click="handleResume" />
+        <i v-if="isPaused" class="pi pi-play cursor-pointer" @click="handleResume" />
         <i v-else class="pi pi-pause cursor-pointer" @click="handlePause" />
         <i class="pi pi-times cursor-pointer" @click="handleDelete" />
       </div>
@@ -58,7 +67,7 @@ const { handleDelete, handlePause, handleResume } = useHandler(props);
     <div class="flex flex-col gap-2">
       <ProgressBar :value="progress" :pt:value:class="progressValueCls" />
       <div class="flex justify-between items-center gap-4">
-        <div v-if="!(task.done || task.paused)" class="flex items-center gap-4">
+        <div v-if="!(isDone || isPaused)" class="flex items-center gap-4">
           <div class="text-success flex items-center gap-2">
             <i class="pi pi-arrow-down" />
             <span>

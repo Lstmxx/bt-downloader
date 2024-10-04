@@ -1,3 +1,5 @@
+import { TASK_STATUS } from "./enum";
+
 export interface SettingConfig {
   downloadPath: string;
 }
@@ -35,7 +37,7 @@ export interface TaskInfo {
 
   // received: number;
 
-  // downloaded: number;
+  downloaded: number;
 
   // uploaded: number;
 
@@ -59,9 +61,7 @@ export interface TaskInfo {
 
   // ready: boolean;
 
-  paused: boolean;
-
-  done: boolean;
+  status: TASK_STATUS;
 
   name: string;
 

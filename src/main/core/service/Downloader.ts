@@ -2,13 +2,17 @@ import { IPC_CHANNEL } from "@shared/ipc";
 import { ipcMain } from "electron";
 import { Downloader } from "../Downloader";
 import { GetFilesByUrlRes } from "@shared/type";
+import { TaskService } from "../db/Task";
+import { taskInfoToTaskModel } from "src/main/utils/transformer";
 
 export class DownloaderService {
   downloaderInstance!: Downloader;
+  taskService: TaskService;
 
   constructor(win: Electron.BrowserWindow) {
     this.initListeners();
     this.downloaderInstance = new Downloader(win);
+    this.taskService = new TaskService();
   }
 
   initListeners() {
@@ -30,7 +34,8 @@ export class DownloaderService {
         options: { downloadPath?: string },
       ) => {
         const result = await this.downloaderInstance.startDownload(torrentList, options);
-
+        const taskModels = result.map(taskInfoToTaskModel);
+        this.taskService.create(taskModels);
         return result;
       },
     );

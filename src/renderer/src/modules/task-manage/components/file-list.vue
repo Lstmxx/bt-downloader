@@ -13,8 +13,8 @@ const props = defineProps({
 });
 
 const getFileTypeIcon = (file: TorrentFile) => {
-  // eslint-disable-next-line max-len
   const videoExtensions =
+    // eslint-disable-next-line max-len
     /\.(mp4|mkv|avi|mov|wmv|flv|webm|vob|ogv|ogg|drc|gif|gifv|mng|mts|m2ts|ts|m4v|3gp|3g2|mxf|roq|nsv)$/i; // 扩展正则表达式匹配更多视频文件扩展名
   if (videoExtensions.test(file.name)) {
     return "pi pi-video";

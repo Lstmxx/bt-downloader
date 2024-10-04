@@ -1,4 +1,4 @@
-import { TaskStatus } from "@shared/enum";
+import { TASK_STATUS } from "@shared/enum";
 import { Entity, PrimaryColumn, Column, OneToMany, ManyToOne } from "typeorm";
 
 @Entity()
@@ -12,7 +12,7 @@ export class TaskModel {
   @Column({ type: "text", nullable: false })
   magnetURI: string;
 
-  @Column({ type: "text", enum: TaskStatus, default: TaskStatus.Pending, nullable: false })
+  @Column({ type: "text", enum: TASK_STATUS, default: TASK_STATUS.PAUSED, nullable: false })
   status: string;
 
   @Column({ type: "date", nullable: false })
@@ -30,6 +30,9 @@ export class TaskModel {
   @Column({ type: "bigint", nullable: false })
   length: number;
 
+  @Column({ type: "int", nullable: false })
+  downloaded: number;
+
   @OneToMany(() => FileModel, (file) => file.task)
   files: FileModel[];
 }
@@ -45,14 +48,11 @@ export class FileModel {
   @Column({ type: "bigint", nullable: false })
   length: number;
 
-  @Column({ type: "boolean", nullable: false })
-  isSelected: boolean;
-
   @Column({ type: "text", nullable: false })
   path: string;
 
-  @Column({ type: "boolean", nullable: false })
-  downloaded: boolean;
+  @Column({ type: "int", nullable: false })
+  downloaded: number;
 
   @ManyToOne(() => TaskModel, (task) => task.files)
   task: TaskModel;

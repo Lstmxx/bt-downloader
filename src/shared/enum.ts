@@ -1,6 +1,5 @@
-export enum TaskStatus {
-  Pending = "Pending",
-  InProgress = "InProgress",
-  Completed = "Completed",
-  Failed = "Failed",
+export enum TASK_STATUS {
+  DOWNLOADING = "downloading",
+  PAUSED = "paused",
+  DONE = "done",
 }

@@ -33,16 +33,16 @@ export class TaskService {
   //初始化主角进程监听事件
 
   //实现新增方法
-  async create(task: TaskModel[]) {
+  async create(tasks: TaskModel[]) {
     await this.dataSource.initialize();
-    const res = await this.dataSource.manager.save(task);
+    const res = await this.dataSource.manager.save(tasks);
     await this.dataSource.destroy();
     return res;
   }
 
-  async update(task: TaskModel) {
+  async update(tasks: TaskModel) {
     await this.dataSource.initialize();
-    const res = await this.dataSource.manager.save(task);
+    const res = await this.dataSource.manager.save(tasks);
     await this.dataSource.destroy();
     return res;
   }

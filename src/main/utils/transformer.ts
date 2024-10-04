@@ -1,5 +1,7 @@
 import { TaskInfo, TorrentFile } from "@shared/type";
 import type Webtorrent from "webtorrent";
+import { FileModel, TaskModel } from "../core/db/model";
+import { TASK_STATUS } from "@shared/enum";
 
 export const torrentFileToFile = (files: Webtorrent.TorrentFile[]): TorrentFile[] => {
   const result: TorrentFile[] = files.map((file) => {
@@ -38,7 +40,37 @@ export const torrentToTaskInfo = (torrent: Webtorrent.Torrent): TaskInfo => {
     createTime: torrent.created,
     maxWebConns: torrent.maxWebConns,
     path: torrent.path,
-    paused: torrent.paused,
-    done: torrent.done,
+    status: torrent.paused ? TASK_STATUS.PAUSED : torrent.done ? TASK_STATUS.DONE : TASK_STATUS.DOWNLOADING,
+    downloaded: torrent.downloaded,
   };
+};
+
+export const torrentFileToFileModel = (file: TorrentFile) => {
+  const fileModel = new FileModel();
+  fileModel.downloaded = file.downloaded;
+  fileModel.length = file.length;
+  fileModel.name = file.name;
+  fileModel.path = file.path;
+  return fileModel;
+};
+
+export const taskInfoToTaskModel = (taskInfo: TaskInfo) => {
+  const taskModel = new TaskModel();
+
+  taskModel.createTime = taskInfo.createTime;
+  if (taskInfo.id) {
+    taskModel.id = taskInfo.id;
+  }
+  taskModel.infoHash = taskInfo.infoHash;
+
+  taskModel.magnetURI = taskInfo.magnetURI;
+  taskModel.name = taskInfo.name;
+  taskModel.path = taskInfo.path;
+  taskModel.progress = taskInfo.progress;
+  taskModel.status = taskInfo.status;
+
+  taskModel.downloaded = taskInfo.downloaded;
+  taskModel.length = taskInfo.length;
+  taskModel.files = taskInfo.files.map(torrentFileToFileModel);
+  return taskModel;
 };
