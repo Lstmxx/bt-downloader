@@ -1,9 +1,7 @@
 // src\main\service\TaskService.ts
-import { ipcMain } from "electron";
 import { DataSource } from "typeorm";
 import { db } from "./index";
 import { TaskModel } from "./model";
-import { DB_IPC_CHANNEL } from "@shared/ipc";
 
 //创建数据查询Modal
 export interface TaskListDTO extends ListDTO {}
@@ -30,25 +28,12 @@ export class TaskService {
   constructor() {
     //创建数据库
     this.dataSource = db.dataSource;
-    this.init();
   }
 
   //初始化主角进程监听事件
-  init() {
-    //新增数据监听
-    ipcMain.handle(DB_IPC_CHANNEL.CREATE_TASK, async (_, data: { task: TaskModel }) => {
-      const task = new TaskModel();
-      Object.keys(data.task).forEach((key) => {
-        task[key] = data.task[key];
-      });
-      const res = await this.create(task);
-
-      return res;
-    });
-  }
 
   //实现新增方法
-  async create(task: TaskModel) {
+  async create(task: TaskModel[]) {
     await this.dataSource.initialize();
     const res = await this.dataSource.manager.save(task);
     await this.dataSource.destroy();

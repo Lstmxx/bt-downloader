@@ -21,7 +21,7 @@ export class DownloaderService {
 
     ipcMain.handle(
       IPC_CHANNEL.START_DOWNLOAD,
-      (
+      async (
         _,
         torrentList: {
           magnetURI: string;
@@ -29,7 +29,9 @@ export class DownloaderService {
         }[],
         options: { downloadPath?: string },
       ) => {
-        return this.downloaderInstance.startDownload(torrentList, options);
+        const result = await this.downloaderInstance.startDownload(torrentList, options);
+
+        return result;
       },
     );
 

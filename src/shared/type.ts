@@ -1,44 +1,43 @@
+export interface SettingConfig {
+  downloadPath: string;
+}
+
 // 定义 File 类型
 export interface TorrentFile {
+  id?: number;
   name: string;
   length: number;
   progress: number;
   path: string;
   downloaded: number;
+  task?: TaskInfo;
 }
 
-export interface SettingConfig {
-  downloadPath: string;
-}
-
-interface TorrentPiece {
+export interface TorrentPiece {
   length: number;
 
   missing: number;
 }
 
 export interface TaskInfo {
+  // database id
+  id?: number;
+
   infoHash: string;
 
   magnetURI: string;
 
-  torrentFileBlobURL: string;
-
   files: TorrentFile[];
 
-  announce: string[];
+  // pieces: Array<TorrentPiece>;
 
-  ["announce-list"]: string[][];
+  // timeRemaining: number;
 
-  pieces: Array<TorrentPiece>;
+  // received: number;
 
-  timeRemaining: number;
+  // downloaded: number;
 
-  received: number;
-
-  downloaded: number;
-
-  uploaded: number;
+  // uploaded: number;
 
   downloadSpeed: number;
 
@@ -46,19 +45,19 @@ export interface TaskInfo {
 
   progress: number;
 
-  ratio: number;
+  // ratio: number;
 
   length: number;
 
-  pieceLength: number;
+  // pieceLength: number;
 
-  lastPieceLength: number;
+  // lastPieceLength: number;
 
-  numPeers: number;
+  // numPeers: number;
 
   path: string;
 
-  ready: boolean;
+  // ready: boolean;
 
   paused: boolean;
 
@@ -66,11 +65,7 @@ export interface TaskInfo {
 
   name: string;
 
-  created: Date;
-
-  createdBy: string;
-
-  comment: string;
+  createTime: Date;
 
   maxWebConns: number;
 }

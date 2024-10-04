@@ -24,6 +24,12 @@ export class TaskModel {
   @Column({ type: "text", nullable: false })
   name: string;
 
+  @Column({ type: "bigint", nullable: false })
+  progress: number;
+
+  @Column({ type: "bigint", nullable: false })
+  length: number;
+
   @OneToMany(() => FileModel, (file) => file.task)
   files: FileModel[];
 }
@@ -46,7 +52,7 @@ export class FileModel {
   path: string;
 
   @Column({ type: "boolean", nullable: false })
-  isDownloaded: boolean;
+  downloaded: boolean;
 
   @ManyToOne(() => TaskModel, (task) => task.files)
   task: TaskModel;
