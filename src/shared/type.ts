@@ -1,6 +1,8 @@
+import WebTorrent from "webtorrent";
 import { TASK_STATUS } from "./enum";
 
 export interface SettingConfig {
+  clientOptions: WebTorrent.Options;
   downloadPath: string;
 }
 

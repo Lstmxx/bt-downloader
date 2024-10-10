@@ -2,7 +2,6 @@ import { app, shell, BrowserWindow, ipcMain } from "electron";
 import { join } from "path";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
 import icon from "../../resources/icon.png?asset";
-import { SettingManage } from "./core/SettingManage";
 import { initDialog } from "./core/dialog";
 import { closeService, initService } from "./core/service";
 
@@ -61,9 +60,6 @@ app.whenReady().then(() => {
   ipcMain.on("ping", () => console.log("pong"));
 
   createWindow();
-
-  const settingManage = new SettingManage();
-  console.log(settingManage);
 
   initService(mainWindow);
 

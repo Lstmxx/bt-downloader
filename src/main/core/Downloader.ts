@@ -5,8 +5,9 @@ import { Notification } from "electron";
 import { IPC_CHANNEL } from "@shared/ipc";
 import { TaskInfo, GetFilesByUrlRes } from "@shared/type";
 import { torrentFileToFile, torrentToTaskInfo } from "../utils/transformer";
-import { getAnnounce } from "../utils/announce";
 import { getFileDialog } from "./dialog";
+
+import { settingManage } from "./SettingManage";
 
 // const torrentProgress = () => {};
 
@@ -49,13 +50,9 @@ export class Downloader {
     this.initWebtorrent();
   }
 
-  async initWebtorrent() {
-    const announce = await getAnnounce();
-    this.instance = new Webtorrent({
-      tracker: {
-        announce,
-      },
-    });
+  initWebtorrent() {
+    const config = settingManage.getClientConfig();
+    this.instance = new Webtorrent(config);
   }
 
   async getFilesByUrl(magnetURI: string): Promise<GetFilesByUrlRes> {
