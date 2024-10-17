@@ -2,7 +2,9 @@ import { IPC_CHANNEL } from "@shared/ipc";
 import { GetFilesByTorrentFileRes, GetFilesByUrlRes, TaskInfo } from "@shared/type";
 
 export const getTorrentFilesByUrl = async (magnetURI: string) => {
-  const files = (await window.ipcRenderer.invoke(IPC_CHANNEL.GET_FILES_BY_URL, magnetURI)) as GetFilesByUrlRes;
+  const files = (await window.ipcRenderer.invoke(IPC_CHANNEL.GET_FILES_BY_URL, magnetURI)) as
+    | GetFilesByUrlRes
+    | undefined;
   return files;
 };
 
@@ -28,8 +30,8 @@ export const getDownloadingTasks = async () => {
   return tasks;
 };
 
-export const getDoneTasks = async () => {
-  const tasks = (await window.ipcRenderer.invoke(IPC_CHANNEL.GET_DONE_TASKS)) as TaskInfo[];
+export const getInProgressTasks = async () => {
+  const tasks = (await window.ipcRenderer.invoke(IPC_CHANNEL.GET_IN_PROGRESS_TASKS)) as TaskInfo[];
   return tasks;
 };
 
@@ -38,14 +40,14 @@ export const getPausedTasks = async () => {
   return tasks;
 };
 
-export const pauseTorrent = async (magnetURI: string) => {
-  await window.ipcRenderer.invoke(IPC_CHANNEL.PAUSE_TORRENT, magnetURI);
+export const pauseTorrent = async (id: string) => {
+  await window.ipcRenderer.invoke(IPC_CHANNEL.PAUSE_TORRENT, id);
 };
 
-export const resumeTorrent = async (magnetURI: string) => {
-  await window.ipcRenderer.invoke(IPC_CHANNEL.RESUME_TORRENT, magnetURI);
+export const resumeTorrent = async (id: string) => {
+  await window.ipcRenderer.invoke(IPC_CHANNEL.RESUME_TORRENT, id);
 };
 
-export const deleteTorrent = async (magnetURI: string) => {
-  await window.ipcRenderer.invoke(IPC_CHANNEL.DELETE_TORRENT, magnetURI);
+export const deleteTorrent = async (id: string) => {
+  await window.ipcRenderer.invoke(IPC_CHANNEL.DELETE_TORRENT, id);
 };

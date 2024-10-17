@@ -12,6 +12,8 @@ import "primeicons/primeicons.css";
 
 import store from "@renderer/store";
 
+import ToastService from "primevue/toastservice";
+
 // If you want use Node.js, the`nodeIntegration` needs to be enabled in the Main process.
 // import './demos/node'
 
@@ -27,6 +29,8 @@ app.use(PrimeVue, {
     },
   },
 });
+
+app.use(ToastService);
 
 app.use(router);
 

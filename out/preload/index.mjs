@@ -10,7 +10,8 @@ const IPC_CHANNEL = {
   RESUME_TORRENT: "downloader:resume-torrent",
   GET_FILES_BY_TORRENT_FILE: "downloader:get-files-by-torrent-file",
   GET_PAUSED_TASKS: "downloader:get-paused-tasks",
-  DELETE_TORRENT: "downloader:delete-torrent"
+  DELETE_TORRENT: "downloader:delete-torrent",
+  GET_IN_PROGRESS_TASKS: "downloader:get-in-progress-tasks"
 };
 const api = {
   onTorrentDone: (cb) => ipcRenderer.on(IPC_CHANNEL.TORRENT_DONE, (_event, magnetURI) => cb(magnetURI))

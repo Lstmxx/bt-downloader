@@ -1,4 +1,4 @@
-import { getDownloadingTasks } from "@renderer/api/task";
+import { getInProgressTasks } from "@renderer/api/task";
 import { loop } from "@renderer/core/utils/loop";
 import { TaskInfo } from "@shared/type";
 import { ref } from "vue";
@@ -14,7 +14,7 @@ export function useLoopGetDownloadingTasksInfo({ handleSuccess, handleError }: P
   const loopFn = async () => {
     isLooping.value = true;
     try {
-      const taskInfos = await getDownloadingTasks();
+      const taskInfos = await getInProgressTasks();
       handleSuccess(taskInfos);
       return true;
     } catch (error) {
@@ -24,7 +24,7 @@ export function useLoopGetDownloadingTasksInfo({ handleSuccess, handleError }: P
     }
   };
 
-  const { start, stop } = loop(loopFn, { interval: 2000 });
+  const { start, stop } = loop(loopFn, { interval: 300 });
 
   const stopLoop = () => {
     isLooping.value = false;

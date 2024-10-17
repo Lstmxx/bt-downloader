@@ -76,7 +76,7 @@ export class Downloader {
     if (index !== -1) {
       const task = this.inProgressTasks.splice(index, 1);
       // todo save task
-      taskRepository.update(taskInfoToTaskModel(torrentToTaskInfo(task[0])));
+      taskRepository.update([taskInfoToTaskModel(torrentToTaskInfo(task[0]))]);
     }
     this.win.webContents.send(IPC_CHANNEL.TORRENT_DONE, magnetURI);
     new Notification({ title: torrent.name, body: "下载完成" }).show();
@@ -116,9 +116,6 @@ export class Downloader {
 
       if (t) {
         this.instance.remove(t);
-        result.push(t);
-        this.inProgressTasks.push(t);
-        return;
       }
 
       await new Promise((resolve, reject) => {
@@ -146,22 +143,74 @@ export class Downloader {
     return result;
   }
 
+  async addTorrents(
+    torrentList: {
+      magnetURI: string;
+      selectFiles: string[];
+      path: string;
+    }[],
+  ) {
+    const result: Webtorrent.Torrent[] = [];
+
+    const promiseList: Promise<void>[] = [];
+
+    const handleTorrent = async (item: { magnetURI: string; selectFiles: string[]; path: string }) => {
+      const t = await this.instance.get(item.magnetURI);
+
+      if (t) {
+        this.instance.remove(t);
+      }
+
+      await new Promise((resolve, reject) => {
+        this.instance.add(item.magnetURI, { path: item.path }, (torrent) => {
+          this.selectFilesInTorrent(torrent, item.selectFiles);
+          result.push(torrent);
+          torrent.pause();
+          resolve(null);
+          torrent.on("done", () => {
+            this.handleTorrentDone(torrent);
+          });
+          torrent.on("error", () => {
+            reject(null);
+          });
+        });
+      });
+    };
+
+    torrentList.forEach((item) => {
+      promiseList.push(handleTorrent(item));
+    });
+
+    await Promise.all(promiseList);
+
+    console.log("add torrents", result);
+
+    this.inProgressTasks.push(...result);
+
+    return result;
+  }
+
   async pauseTorrent(id: string) {
+    console.log("parse", id);
     const t = this.inProgressTasks.find((item) => item.id === id);
+    console.log("pause", t);
     if (t) {
       t.pause();
     }
   }
 
   async resumeTorrent(id: string) {
+    console.log("resume", id);
     const t = this.inProgressTasks.find((item) => item.id === id);
+    console.log("resume", t);
     if (t) {
       t.resume();
+      console.log("resume", t.done, t.paused);
     }
   }
 
-  async deleteTorrent(magnetURI: string) {
-    const t = await this.instance.get(magnetURI);
+  async deleteTorrent(id: string) {
+    const t = this.inProgressTasks.find((item) => item.id === id);
     if (t) {
       t.pause();
       this.instance.remove(t);

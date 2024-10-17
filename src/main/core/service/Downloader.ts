@@ -22,6 +22,11 @@ export class DownloaderService {
       return this.downloaderInstance.getFilesByTorrentFile();
     });
 
+    ipcMain.handle(IPC_CHANNEL.GET_DONE_TASKS, async () => {
+      const tasks = await taskRepository.getDoneTasks();
+      return tasks;
+    });
+
     ipcMain.handle(
       IPC_CHANNEL.START_DOWNLOAD,
       async (
@@ -43,7 +48,7 @@ export class DownloaderService {
         });
         console.log("databaseResult", databaseResult);
 
-        return result;
+        return result.map(torrentToTaskInfo);
       },
     );
 
@@ -51,24 +56,42 @@ export class DownloaderService {
       return this.downloaderInstance.getInProgressTasks();
     });
 
-    ipcMain.handle(IPC_CHANNEL.PAUSE_TORRENT, (_, magnetURI: string) => {
-      this.downloaderInstance.pauseTorrent(magnetURI);
+    ipcMain.handle(IPC_CHANNEL.PAUSE_TORRENT, (_, id: string) => {
+      this.downloaderInstance.pauseTorrent(id);
     });
 
-    ipcMain.handle(IPC_CHANNEL.RESUME_TORRENT, (_, magnetURI: string) => {
-      this.downloaderInstance.resumeTorrent(magnetURI);
+    ipcMain.handle(IPC_CHANNEL.RESUME_TORRENT, (_, id: string) => {
+      this.downloaderInstance.resumeTorrent(id);
     });
-    ipcMain.handle(IPC_CHANNEL.DELETE_TORRENT, (_, magnetURI: string) => {
-      this.downloaderInstance.deleteTorrent(magnetURI);
+    ipcMain.handle(IPC_CHANNEL.DELETE_TORRENT, (_, id: string) => {
+      this.downloaderInstance.deleteTorrent(id);
     });
   }
 
   async initData() {
-    const { count, list } = await taskRepository.getList({ pageNum: 1, pageSize: 100, sort: 2 });
-    console.log(count, list);
+    const tasks = await taskRepository.getInProgressTasks();
+    console.log("initData", tasks);
+    const taskInfos = tasks.map((item) => {
+      return {
+        magnetURI: item.magnetURI,
+        selectFiles: (item.files || []).map((file) => file.name),
+        path: item.path,
+      };
+    });
+    const result = await this.downloaderInstance.addTorrents(taskInfos);
+    console.log("result", result);
+    result.forEach((item, index) => {
+      item.id = tasks[index].id;
+      console.log("item.id", item.id);
+    });
   }
 
   close() {
     this.downloaderInstance.destroy();
+
+    const taskModels = this.downloaderInstance.inProgressTasks.map((item) =>
+      taskInfoToTaskModel(torrentToTaskInfo(item)),
+    );
+    taskRepository.update(taskModels);
   }
 }

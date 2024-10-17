@@ -1,5 +1,5 @@
 import { TASK_STATUS } from "@shared/enum";
-import { Entity, PrimaryColumn, Column, OneToMany, ManyToOne } from "typeorm";
+import { Entity, PrimaryColumn, Column, OneToMany, ManyToOne, CreateDateColumn } from "typeorm";
 
 @Entity()
 export class TaskModel {
@@ -15,7 +15,7 @@ export class TaskModel {
   @Column({ type: "text", enum: TASK_STATUS, default: TASK_STATUS.PAUSED, nullable: false })
   status: string;
 
-  @Column({ type: "date", nullable: false })
+  @CreateDateColumn({ type: "date", nullable: false })
   createTime: Date;
 
   @Column({ type: "text", nullable: false })

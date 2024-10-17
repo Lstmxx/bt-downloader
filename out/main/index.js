@@ -1,9 +1,10 @@
 import { ipcMain, dialog, app, Notification, BrowserWindow, shell } from "electron";
 import path, { join } from "path";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
-import { PrimaryColumn, Column, OneToMany, Entity, ManyToOne, DataSource } from "typeorm";
+import { PrimaryColumn, Column, CreateDateColumn, OneToMany, Entity, ManyToOne, DataSource } from "typeorm";
 import Webtorrent from "webtorrent";
 import fs, { promises } from "node:fs";
+import { nanoid } from "nanoid";
 import Store from "electron-store";
 import __cjs_mod__ from "node:module";
 const __filename = import.meta.filename;
@@ -20,7 +21,8 @@ const IPC_CHANNEL = {
   RESUME_TORRENT: "downloader:resume-torrent",
   GET_FILES_BY_TORRENT_FILE: "downloader:get-files-by-torrent-file",
   GET_PAUSED_TASKS: "downloader:get-paused-tasks",
-  DELETE_TORRENT: "downloader:delete-torrent"
+  DELETE_TORRENT: "downloader:delete-torrent",
+  GET_IN_PROGRESS_TASKS: "downloader:get-in-progress-tasks"
 };
 const IPC_DIALOG_CHANNEL = {
   GET_DICT_PATH: "dialog:get-dict-path"
@@ -77,7 +79,7 @@ let TaskModel = class {
   files;
 };
 __decorateClass([
-  PrimaryColumn({ type: "int" })
+  PrimaryColumn({ type: "text" })
 ], TaskModel.prototype, "id", 2);
 __decorateClass([
   Column({ type: "text", nullable: false })
@@ -89,7 +91,7 @@ __decorateClass([
   Column({ type: "text", enum: TASK_STATUS, default: TASK_STATUS.PAUSED, nullable: false })
 ], TaskModel.prototype, "status", 2);
 __decorateClass([
-  Column({ type: "date", nullable: false })
+  CreateDateColumn({ type: "date", nullable: false })
 ], TaskModel.prototype, "createTime", 2);
 __decorateClass([
   Column({ type: "text", nullable: false })
@@ -121,7 +123,7 @@ let FileModel = class {
   task;
 };
 __decorateClass([
-  PrimaryColumn({ type: "int" })
+  PrimaryColumn({ type: "text" })
 ], FileModel.prototype, "id", 2);
 __decorateClass([
   Column({ type: "text", nullable: false })
@@ -175,6 +177,7 @@ const torrentFileToFile = (files) => {
 };
 const torrentToTaskInfo = (torrent) => {
   return {
+    id: torrent.id,
     infoHash: torrent.infoHash,
     magnetURI: torrent.magnetURI,
     files: torrentFileToFile(torrent.files),
@@ -186,12 +189,13 @@ const torrentToTaskInfo = (torrent) => {
     createTime: torrent.created,
     maxWebConns: torrent.maxWebConns,
     path: torrent.path,
-    status: torrent.paused ? TASK_STATUS.PAUSED : torrent.done ? TASK_STATUS.DONE : TASK_STATUS.DOWNLOADING,
+    status: torrent.done ? TASK_STATUS.PAUSED : torrent.done ? TASK_STATUS.DONE : TASK_STATUS.DOWNLOADING,
     downloaded: torrent.downloaded
   };
 };
 const torrentFileToFileModel = (file) => {
   const fileModel = new FileModel();
+  fileModel.id = file.id || nanoid();
   fileModel.downloaded = file.downloaded;
   fileModel.length = file.length;
   fileModel.name = file.name;
@@ -201,9 +205,7 @@ const torrentFileToFileModel = (file) => {
 const taskInfoToTaskModel = (taskInfo) => {
   const taskModel = new TaskModel();
   taskModel.createTime = taskInfo.createTime;
-  if (taskInfo.id) {
-    taskModel.id = taskInfo.id;
-  }
+  taskModel.id = taskInfo.id || nanoid();
   taskModel.infoHash = taskInfo.infoHash;
   taskModel.magnetURI = taskInfo.magnetURI;
   taskModel.name = taskInfo.name;
@@ -273,152 +275,13 @@ class SettingManage {
   }
 }
 const settingManage = new SettingManage();
-const getTorrentFiles = async (instance, magnetURI) => {
-  return new Promise(async (resolve, reject) => {
-    const t = await instance.get(magnetURI);
-    if (t) {
-      instance.remove(t);
-    }
-    console.log("add:", magnetURI);
-    instance.add(magnetURI, function(torrent) {
-      torrent.pause();
-      console.log("torrent:", torrent);
-      resolve({ files: torrent.files, torrent });
-      torrent.on("error", (err) => {
-        reject(err);
-      });
-    });
-    instance.on("error", (err) => {
-      console.log("torrent:", err);
-      reject(err);
-    });
-  });
-};
-class Downloader {
-  instance;
-  win;
-  downloadingTasks = [];
-  pausedTasks = [];
-  doneTasks = [];
-  constructor(win) {
-    this.win = win;
-    this.initWebtorrent();
-  }
-  initWebtorrent() {
-    const config = settingManage.getClientConfig();
-    this.instance = new Webtorrent(config);
-  }
-  async getFilesByUrl(magnetURI) {
-    const { files, torrent } = await getTorrentFiles(this.instance, magnetURI);
-    return { files: torrentFileToFile(files), magnetURI: torrent.magnetURI };
-  }
-  async getFilesByTorrentFile() {
-    const [path2] = await getFileDialog([{ name: "Torrent", extensions: ["torrent"] }]);
-    if (!path2) return;
-    const data = await promises.readFile(path2);
-    const { files, torrent } = await getTorrentFiles(this.instance, data);
-    return { files: torrentFileToFile(files), magnetURI: torrent.magnetURI };
-  }
-  handleTorrentDone(torrent) {
-    const { magnetURI } = torrent;
-    const index = this.downloadingTasks.findIndex((item) => item.magnetURI === magnetURI);
-    if (index !== -1) {
-      this.downloadingTasks.splice(index, 1);
-      this.doneTasks.push(torrentToTaskInfo(torrent));
-    }
-    this.win.webContents.send(IPC_CHANNEL.TORRENT_DONE, magnetURI);
-    new Notification({ title: torrent.name, body: "下载完成" }).show();
-  }
-  selectFilesInTorrent(torrent, selectFiles) {
-    torrent.files.forEach((file) => {
-      if (selectFiles.includes(file.name)) {
-        file.select();
-      } else {
-        file.deselect();
-      }
-    });
-  }
-  getDownloadingTasks() {
-    return this.downloadingTasks.map(torrentToTaskInfo);
-  }
-  getDoneTasks() {
-    return this.doneTasks;
-  }
-  getPausedTasks() {
-    return this.pausedTasks.map(torrentToTaskInfo);
-  }
-  handleTorrentProgressUpdate(torrent) {
-    console.log(`${torrent.name} progress:`, torrent.progress);
-  }
-  async startDownload(torrentList, options) {
-    const result = [];
-    const promiseList = [];
-    const handleTorrent = async (item) => {
-      const t = await this.instance.get(item.magnetURI);
-      if (t) {
-        this.instance.remove(t);
-        result.push(torrentToTaskInfo(t));
-        this.downloadingTasks.push(t);
-        return;
-      }
-      await new Promise((resolve, reject) => {
-        this.instance.add(item.magnetURI, { path: options.downloadPath }, (torrent) => {
-          this.selectFilesInTorrent(torrent, item.selectFiles);
-          result.push(torrentToTaskInfo(torrent));
-          this.downloadingTasks.push(torrent);
-          resolve(null);
-          torrent.on("done", () => {
-            this.handleTorrentDone(torrent);
-          });
-          torrent.on("error", () => {
-            reject(null);
-          });
-        });
-      });
-    };
-    torrentList.forEach((item) => {
-      promiseList.push(handleTorrent(item));
-    });
-    await Promise.all(promiseList);
-    return result;
-  }
-  async pauseTorrent(magnetURI) {
-    const t = await this.instance.get(magnetURI);
-    if (t) {
-      t.pause();
-      this.downloadingTasks = this.downloadingTasks.filter((item) => item.magnetURI !== magnetURI);
-      this.pausedTasks.push(t);
-    }
-  }
-  async resumeTorrent(magnetURI) {
-    const t = await this.instance.get(magnetURI);
-    if (t) {
-      t.resume();
-      this.pausedTasks = this.pausedTasks.filter((item) => item.magnetURI !== magnetURI);
-      this.downloadingTasks.push(t);
-    }
-  }
-  async deleteTorrent(magnetURI) {
-    const t = await this.instance.get(magnetURI);
-    if (t) {
-      t.pause();
-      this.instance.remove(t);
-    }
-  }
-  destroy() {
-    this.downloadingTasks.forEach((item) => {
-      item.pause();
-    });
-    this.instance.destroy();
-  }
-}
-class TaskService {
+class TaskRepository {
   static instance;
   dataSource;
   //使用单例模式
   static getInstance() {
     if (!this.instance) {
-      this.instance = new TaskService();
+      this.instance = new TaskRepository();
     }
     return this.instance;
   }
@@ -449,18 +312,195 @@ class TaskService {
     await this.dataSource.destroy();
     return { list: listAndCount[0], count: listAndCount[1] };
   }
+  async getInProgressTasks() {
+    await this.dataSource.initialize();
+    const list = await this.dataSource.manager.find(TaskModel, {
+      where: [{ status: TASK_STATUS.DOWNLOADING }, { status: TASK_STATUS.PAUSED }],
+      order: { createTime: "DESC" }
+    });
+    await this.dataSource.destroy();
+    return list;
+  }
+  async getDoneTasks() {
+    await this.dataSource.initialize();
+    const list = await this.dataSource.manager.find(TaskModel, {
+      where: { status: TASK_STATUS.DONE },
+      order: { createTime: "DESC" }
+    });
+    await this.dataSource.destroy();
+    return list;
+  }
   close() {
     this.dataSource.destroy();
     console.log("TaskService closed");
   }
 }
+const taskRepository = new TaskRepository();
+const getTorrentFiles = async (instance, magnetURI) => {
+  return new Promise(async (resolve, reject) => {
+    const t = await instance.get(magnetURI);
+    if (t) {
+      instance.remove(t);
+    }
+    console.log("add:", magnetURI);
+    instance.add(magnetURI, function(torrent) {
+      torrent.pause();
+      console.log("torrent:", torrent);
+      resolve({ files: torrent.files, torrent });
+      torrent.on("error", (err) => {
+        reject(err);
+      });
+    });
+    instance.on("error", (err) => {
+      console.log("torrent:", err);
+      reject(err);
+    });
+  });
+};
+class Downloader {
+  instance;
+  win;
+  inProgressTasks = [];
+  constructor(win) {
+    this.win = win;
+    this.initWebtorrent();
+  }
+  initWebtorrent() {
+    const config = settingManage.getClientConfig();
+    this.instance = new Webtorrent(config);
+  }
+  async getFilesByUrl(magnetURI) {
+    const { files, torrent } = await getTorrentFiles(this.instance, magnetURI);
+    return { files: torrentFileToFile(files), magnetURI: torrent.magnetURI };
+  }
+  async getFilesByTorrentFile() {
+    const [path2] = await getFileDialog([{ name: "Torrent", extensions: ["torrent"] }]);
+    if (!path2) return;
+    const data = await promises.readFile(path2);
+    const { files, torrent } = await getTorrentFiles(this.instance, data);
+    return { files: torrentFileToFile(files), magnetURI: torrent.magnetURI };
+  }
+  handleTorrentDone(torrent) {
+    const { magnetURI, id } = torrent;
+    const index = this.inProgressTasks.findIndex((item) => item.magnetURI === magnetURI || item.id === id);
+    if (index !== -1) {
+      const task = this.inProgressTasks.splice(index, 1);
+      taskRepository.update([taskInfoToTaskModel(torrentToTaskInfo(task[0]))]);
+    }
+    this.win.webContents.send(IPC_CHANNEL.TORRENT_DONE, magnetURI);
+    new Notification({ title: torrent.name, body: "下载完成" }).show();
+  }
+  selectFilesInTorrent(torrent, selectFiles) {
+    torrent.files.forEach((file) => {
+      if (selectFiles.includes(file.name)) {
+        file.select();
+      } else {
+        file.deselect();
+      }
+    });
+  }
+  getInProgressTasks() {
+    return this.inProgressTasks.map(torrentToTaskInfo);
+  }
+  handleTorrentProgressUpdate(torrent) {
+    console.log(`${torrent.name} progress:`, torrent.progress);
+  }
+  async startDownload(torrentList, options) {
+    const result = [];
+    const promiseList = [];
+    const handleTorrent = async (item) => {
+      const t = await this.instance.get(item.magnetURI);
+      if (t) {
+        this.instance.remove(t);
+      }
+      await new Promise((resolve, reject) => {
+        this.instance.add(item.magnetURI, { path: options.downloadPath }, (torrent) => {
+          this.selectFilesInTorrent(torrent, item.selectFiles);
+          result.push(torrent);
+          this.inProgressTasks.push(torrent);
+          resolve(null);
+          torrent.on("done", () => {
+            this.handleTorrentDone(torrent);
+          });
+          torrent.on("error", () => {
+            reject(null);
+          });
+        });
+      });
+    };
+    torrentList.forEach((item) => {
+      promiseList.push(handleTorrent(item));
+    });
+    await Promise.all(promiseList);
+    return result;
+  }
+  async addTorrents(torrentList) {
+    const result = [];
+    const promiseList = [];
+    const handleTorrent = async (item) => {
+      const t = await this.instance.get(item.magnetURI);
+      if (t) {
+        this.instance.remove(t);
+      }
+      await new Promise((resolve, reject) => {
+        this.instance.add(item.magnetURI, { path: item.path }, (torrent) => {
+          this.selectFilesInTorrent(torrent, item.selectFiles);
+          result.push(torrent);
+          torrent.pause();
+          resolve(null);
+          torrent.on("done", () => {
+            this.handleTorrentDone(torrent);
+          });
+          torrent.on("error", () => {
+            reject(null);
+          });
+        });
+      });
+    };
+    torrentList.forEach((item) => {
+      promiseList.push(handleTorrent(item));
+    });
+    await Promise.all(promiseList);
+    console.log("add torrents", result);
+    this.inProgressTasks.push(...result);
+    return result;
+  }
+  async pauseTorrent(id) {
+    console.log("parse", id);
+    const t = this.inProgressTasks.find((item) => item.id === id);
+    console.log("pause", t);
+    if (t) {
+      t.pause();
+    }
+  }
+  async resumeTorrent(id) {
+    console.log("resume", id);
+    const t = this.inProgressTasks.find((item) => item.id === id);
+    console.log("resume", t);
+    if (t) {
+      t.resume();
+      console.log("resume", t.done, t.paused);
+    }
+  }
+  async deleteTorrent(id) {
+    const t = this.inProgressTasks.find((item) => item.id === id);
+    if (t) {
+      t.pause();
+      this.instance.remove(t);
+    }
+  }
+  destroy() {
+    this.inProgressTasks.forEach((item) => {
+      item.pause();
+    });
+    this.instance.destroy();
+  }
+}
 class DownloaderService {
   downloaderInstance;
-  taskService;
   constructor(win) {
     this.initListeners();
     this.downloaderInstance = new Downloader(win);
-    this.taskService = new TaskService();
     this.initData();
   }
   initListeners() {
@@ -470,42 +510,60 @@ class DownloaderService {
     ipcMain.handle(IPC_CHANNEL.GET_FILES_BY_TORRENT_FILE, async () => {
       return this.downloaderInstance.getFilesByTorrentFile();
     });
+    ipcMain.handle(IPC_CHANNEL.GET_DONE_TASKS, async () => {
+      const tasks = await taskRepository.getDoneTasks();
+      return tasks;
+    });
     ipcMain.handle(
       IPC_CHANNEL.START_DOWNLOAD,
       async (_, torrentList, options) => {
         const result = await this.downloaderInstance.startDownload(torrentList, options);
         console.log("startDownload", result);
-        const taskModels = result.map(taskInfoToTaskModel);
-        const databaseResult = await this.taskService.create(taskModels);
+        const taskModels = result.map((item) => taskInfoToTaskModel(torrentToTaskInfo(item)));
+        const databaseResult = await taskRepository.create(taskModels);
+        result.forEach((item, index) => {
+          item.id = databaseResult[index].id;
+        });
         console.log("databaseResult", databaseResult);
-        return result;
+        return result.map(torrentToTaskInfo);
       }
     );
-    ipcMain.handle(IPC_CHANNEL.GET_DOWNLOADING_TASKS, () => {
-      return this.downloaderInstance.getDownloadingTasks();
+    ipcMain.handle(IPC_CHANNEL.GET_IN_PROGRESS_TASKS, () => {
+      return this.downloaderInstance.getInProgressTasks();
     });
-    ipcMain.handle(IPC_CHANNEL.GET_DONE_TASKS, () => {
-      return this.downloaderInstance.getDoneTasks();
+    ipcMain.handle(IPC_CHANNEL.PAUSE_TORRENT, (_, id) => {
+      this.downloaderInstance.pauseTorrent(id);
     });
-    ipcMain.handle(IPC_CHANNEL.GET_PAUSED_TASKS, () => {
-      return this.downloaderInstance.getPausedTasks();
+    ipcMain.handle(IPC_CHANNEL.RESUME_TORRENT, (_, id) => {
+      this.downloaderInstance.resumeTorrent(id);
     });
-    ipcMain.handle(IPC_CHANNEL.PAUSE_TORRENT, (_, magnetURI) => {
-      this.downloaderInstance.pauseTorrent(magnetURI);
-    });
-    ipcMain.handle(IPC_CHANNEL.RESUME_TORRENT, (_, magnetURI) => {
-      this.downloaderInstance.resumeTorrent(magnetURI);
-    });
-    ipcMain.handle(IPC_CHANNEL.DELETE_TORRENT, (_, magnetURI) => {
-      this.downloaderInstance.deleteTorrent(magnetURI);
+    ipcMain.handle(IPC_CHANNEL.DELETE_TORRENT, (_, id) => {
+      this.downloaderInstance.deleteTorrent(id);
     });
   }
   async initData() {
-    const { count, list } = await this.taskService.getList({ pageNum: 1, pageSize: 100, sort: 2 });
-    console.log(count, list);
+    const tasks = await taskRepository.getInProgressTasks();
+    console.log("initData", tasks);
+    const taskInfos = tasks.map((item) => {
+      return {
+        magnetURI: item.magnetURI,
+        selectFiles: (item.files || []).map((file) => file.name),
+        path: item.path
+      };
+    });
+    const result = await this.downloaderInstance.addTorrents(taskInfos);
+    console.log("result", result);
+    result.forEach((item, index) => {
+      item.id = tasks[index].id;
+      console.log("item.id", item.id);
+    });
   }
   close() {
     this.downloaderInstance.destroy();
+    const taskModels = this.downloaderInstance.inProgressTasks.map(
+      (item) => taskInfoToTaskModel(torrentToTaskInfo(item))
+    );
+    taskRepository.update(taskModels);
   }
 }
 class SettingManageService {
@@ -521,19 +579,17 @@ class SettingManageService {
     console.log("close");
   }
 }
-let taskService;
 let downloaderService;
 let settingManageService;
 const initService = async (win) => {
   console.log("Service initialized");
   await settingManage.initConfig();
-  taskService = new TaskService();
   downloaderService = new DownloaderService(win);
   settingManageService = new SettingManageService();
 };
 const closeService = () => {
   console.log("Service closed");
-  taskService.close();
+  taskRepository.close();
   downloaderService.close();
   db.close();
   settingManageService.close();

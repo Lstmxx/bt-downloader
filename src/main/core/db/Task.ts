@@ -1,6 +1,7 @@
 import { DataSource } from "typeorm";
 import { db } from "./index";
 import { TaskModel } from "./model";
+import { TASK_STATUS } from "@shared/enum";
 
 //创建数据查询Modal
 export interface TaskListDTO extends ListDTO {}
@@ -41,7 +42,7 @@ class TaskRepository {
     return res;
   }
 
-  async update(tasks: TaskModel) {
+  async update(tasks: TaskModel[]) {
     await this.dataSource.initialize();
     const res = await this.dataSource.manager.save(tasks);
     await this.dataSource.destroy();
@@ -61,6 +62,26 @@ class TaskRepository {
       .getManyAndCount();
     await this.dataSource.destroy();
     return { list: listAndCount[0], count: listAndCount[1] };
+  }
+
+  async getInProgressTasks() {
+    await this.dataSource.initialize();
+    const list = await this.dataSource.manager.find(TaskModel, {
+      where: [{ status: TASK_STATUS.DOWNLOADING }, { status: TASK_STATUS.PAUSED }],
+      order: { createTime: "DESC" },
+    });
+    await this.dataSource.destroy();
+    return list;
+  }
+
+  async getDoneTasks() {
+    await this.dataSource.initialize();
+    const list = await this.dataSource.manager.find(TaskModel, {
+      where: { status: TASK_STATUS.DONE },
+      order: { createTime: "DESC" },
+    });
+    await this.dataSource.destroy();
+    return list;
   }
   close() {
     this.dataSource.destroy();

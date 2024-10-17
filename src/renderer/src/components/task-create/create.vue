@@ -26,7 +26,9 @@ const isValidUrl = computed(() => {
 const handleSubmit = async () => {
   loading.value = true;
   try {
-    const { files, magnetURI } = await getTorrentFilesByUrl(url.value);
+    const result = await getTorrentFilesByUrl(url.value);
+    if (!result) return;
+    const { files, magnetURI } = result;
     console.log("render", files);
     emit("success", { files, magnetURI });
   } catch (error) {

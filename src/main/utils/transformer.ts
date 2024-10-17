@@ -31,6 +31,7 @@ export const torrentPieceToPiece = (pieces: Array<Webtorrent.TorrentPiece | null
 
 export const torrentToTaskInfo = (torrent: Webtorrent.Torrent): TaskInfo => {
   return {
+    id: torrent.id,
     infoHash: torrent.infoHash,
     magnetURI: torrent.magnetURI,
     files: torrentFileToFile(torrent.files),
