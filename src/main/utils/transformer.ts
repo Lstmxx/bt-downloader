@@ -3,6 +3,8 @@ import type Webtorrent from "webtorrent";
 import { FileModel, TaskModel } from "../core/db/model";
 import { TASK_STATUS } from "@shared/enum";
 
+import { nanoid } from "nanoid";
+
 export const torrentFileToFile = (files: Webtorrent.TorrentFile[]): TorrentFile[] => {
   const result: TorrentFile[] = files.map((file) => {
     return {
@@ -40,13 +42,14 @@ export const torrentToTaskInfo = (torrent: Webtorrent.Torrent): TaskInfo => {
     createTime: torrent.created,
     maxWebConns: torrent.maxWebConns,
     path: torrent.path,
-    status: torrent.paused ? TASK_STATUS.PAUSED : torrent.done ? TASK_STATUS.DONE : TASK_STATUS.DOWNLOADING,
+    status: torrent.done ? TASK_STATUS.PAUSED : torrent.done ? TASK_STATUS.DONE : TASK_STATUS.DOWNLOADING,
     downloaded: torrent.downloaded,
   };
 };
 
 export const torrentFileToFileModel = (file: TorrentFile) => {
   const fileModel = new FileModel();
+  fileModel.id = file.id || nanoid();
   fileModel.downloaded = file.downloaded;
   fileModel.length = file.length;
   fileModel.name = file.name;
@@ -58,9 +61,9 @@ export const taskInfoToTaskModel = (taskInfo: TaskInfo) => {
   const taskModel = new TaskModel();
 
   taskModel.createTime = taskInfo.createTime;
-  if (taskInfo.id) {
-    taskModel.id = taskInfo.id;
-  }
+
+  taskModel.id = taskInfo.id || nanoid();
+
   taskModel.infoHash = taskInfo.infoHash;
 
   taskModel.magnetURI = taskInfo.magnetURI;

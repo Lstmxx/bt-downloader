@@ -1,25 +1,15 @@
-import { app, ipcMain, dialog, Notification, BrowserWindow, shell } from "electron";
+import { ipcMain, dialog, app, Notification, BrowserWindow, shell } from "electron";
 import path, { join } from "path";
 import { electronApp, optimizer, is } from "@electron-toolkit/utils";
-import Store from "electron-store";
 import { PrimaryColumn, Column, OneToMany, Entity, ManyToOne, DataSource } from "typeorm";
 import Webtorrent from "webtorrent";
 import fs, { promises } from "node:fs";
+import Store from "electron-store";
 import __cjs_mod__ from "node:module";
 const __filename = import.meta.filename;
 const __dirname = import.meta.dirname;
 const require2 = __cjs_mod__.createRequire(import.meta.url);
 const icon = join(__dirname, "../../resources/icon.png");
-const getUserDataPath = () => {
-  return app.getPath("userData");
-};
-const getDownloadPath = () => {
-  return app.getPath("downloads");
-};
-const getConfigBasePath = () => {
-  const path2 = getUserDataPath();
-  return path2;
-};
 const IPC_CHANNEL = {
   GET_FILES_BY_URL: "downloader:get-files-by-url",
   GET_DOWNLOADING_TASKS: "downloader:get-downloading-tasks",
@@ -32,9 +22,6 @@ const IPC_CHANNEL = {
   GET_PAUSED_TASKS: "downloader:get-paused-tasks",
   DELETE_TORRENT: "downloader:delete-torrent"
 };
-const DB_IPC_CHANNEL = {
-  CREATE_TASK: "db:create-task"
-};
 const IPC_DIALOG_CHANNEL = {
   GET_DICT_PATH: "dialog:get-dict-path"
 };
@@ -42,30 +29,6 @@ const IPC_CONFIG_CHANNEL = {
   GET_CONFIG: "config:get",
   SET_CONFIG: "config:set"
 };
-class SettingManage {
-  configStore;
-  constructor() {
-    this.initConfig();
-    this.initListeners();
-  }
-  initListeners() {
-    ipcMain.handle(IPC_CONFIG_CHANNEL.GET_CONFIG, () => {
-      return this.getConfig();
-    });
-  }
-  initConfig() {
-    this.configStore = new Store({
-      name: "config",
-      cwd: getConfigBasePath(),
-      defaults: {
-        downloadPath: getDownloadPath()
-      }
-    });
-  }
-  getConfig() {
-    return this.configStore.store;
-  }
-}
 const getPathDialog = async (_, defaultPath) => {
   const { filePaths } = await dialog.showOpenDialog({
     properties: ["openDirectory"],
@@ -84,13 +47,12 @@ const getFileDialog = async (filters, multi = false) => {
 const initDialog = () => {
   ipcMain.handle(IPC_DIALOG_CHANNEL.GET_DICT_PATH, getPathDialog);
 };
-var TaskStatus = /* @__PURE__ */ ((TaskStatus2) => {
-  TaskStatus2["Pending"] = "Pending";
-  TaskStatus2["InProgress"] = "InProgress";
-  TaskStatus2["Completed"] = "Completed";
-  TaskStatus2["Failed"] = "Failed";
-  return TaskStatus2;
-})(TaskStatus || {});
+var TASK_STATUS = /* @__PURE__ */ ((TASK_STATUS2) => {
+  TASK_STATUS2["DOWNLOADING"] = "downloading";
+  TASK_STATUS2["PAUSED"] = "paused";
+  TASK_STATUS2["DONE"] = "done";
+  return TASK_STATUS2;
+})(TASK_STATUS || {});
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __decorateClass = (decorators, target, key, kind) => {
@@ -109,6 +71,9 @@ let TaskModel = class {
   createTime;
   path;
   name;
+  progress;
+  length;
+  downloaded;
   files;
 };
 __decorateClass([
@@ -121,7 +86,7 @@ __decorateClass([
   Column({ type: "text", nullable: false })
 ], TaskModel.prototype, "magnetURI", 2);
 __decorateClass([
-  Column({ type: "text", enum: TaskStatus, default: TaskStatus.Pending, nullable: false })
+  Column({ type: "text", enum: TASK_STATUS, default: TASK_STATUS.PAUSED, nullable: false })
 ], TaskModel.prototype, "status", 2);
 __decorateClass([
   Column({ type: "date", nullable: false })
@@ -133,6 +98,15 @@ __decorateClass([
   Column({ type: "text", nullable: false })
 ], TaskModel.prototype, "name", 2);
 __decorateClass([
+  Column({ type: "bigint", nullable: false })
+], TaskModel.prototype, "progress", 2);
+__decorateClass([
+  Column({ type: "bigint", nullable: false })
+], TaskModel.prototype, "length", 2);
+__decorateClass([
+  Column({ type: "int", nullable: false })
+], TaskModel.prototype, "downloaded", 2);
+__decorateClass([
   OneToMany(() => FileModel, (file) => file.task)
 ], TaskModel.prototype, "files", 2);
 TaskModel = __decorateClass([
@@ -142,9 +116,8 @@ let FileModel = class {
   id;
   name;
   length;
-  isSelected;
   path;
-  isDownloaded;
+  downloaded;
   task;
 };
 __decorateClass([
@@ -157,14 +130,11 @@ __decorateClass([
   Column({ type: "bigint", nullable: false })
 ], FileModel.prototype, "length", 2);
 __decorateClass([
-  Column({ type: "boolean", nullable: false })
-], FileModel.prototype, "isSelected", 2);
-__decorateClass([
   Column({ type: "text", nullable: false })
 ], FileModel.prototype, "path", 2);
 __decorateClass([
-  Column({ type: "boolean", nullable: false })
-], FileModel.prototype, "isDownloaded", 2);
+  Column({ type: "int", nullable: false })
+], FileModel.prototype, "downloaded", 2);
 __decorateClass([
   ManyToOne(() => TaskModel, (task) => task.files)
 ], FileModel.prototype, "task", 2);
@@ -203,47 +173,57 @@ const torrentFileToFile = (files) => {
   });
   return result;
 };
-const torrentPieceToPiece = (pieces) => {
-  if (!pieces) return [];
-  const result = (pieces || []).map((piece) => {
-    return {
-      length: piece?.length || 0,
-      missing: piece?.missing || 0
-    };
-  });
-  return result;
-};
 const torrentToTaskInfo = (torrent) => {
   return {
     infoHash: torrent.infoHash,
     magnetURI: torrent.magnetURI,
-    torrentFileBlobURL: torrent.torrentFileBlobURL,
     files: torrentFileToFile(torrent.files),
-    announce: torrent.announce,
-    ["announce-list"]: torrent["announce-list"],
-    pieces: torrentPieceToPiece(torrent.pieces),
-    timeRemaining: torrent.timeRemaining,
-    received: torrent.received,
-    downloaded: torrent.downloaded,
-    uploaded: torrent.uploaded,
     downloadSpeed: torrent.downloadSpeed,
     uploadSpeed: torrent.uploadSpeed,
     progress: torrent.progress,
-    ratio: torrent.ratio,
     length: torrent.length,
-    pieceLength: torrent.pieceLength,
-    lastPieceLength: torrent.lastPieceLength,
-    numPeers: torrent.numPeers,
     name: torrent.name,
-    created: torrent.created,
-    createdBy: torrent.createdBy,
-    comment: torrent.comment,
+    createTime: torrent.created,
     maxWebConns: torrent.maxWebConns,
     path: torrent.path,
-    ready: torrent.ready,
-    paused: torrent.paused,
-    done: torrent.done
+    status: torrent.paused ? TASK_STATUS.PAUSED : torrent.done ? TASK_STATUS.DONE : TASK_STATUS.DOWNLOADING,
+    downloaded: torrent.downloaded
   };
+};
+const torrentFileToFileModel = (file) => {
+  const fileModel = new FileModel();
+  fileModel.downloaded = file.downloaded;
+  fileModel.length = file.length;
+  fileModel.name = file.name;
+  fileModel.path = file.path;
+  return fileModel;
+};
+const taskInfoToTaskModel = (taskInfo) => {
+  const taskModel = new TaskModel();
+  taskModel.createTime = taskInfo.createTime;
+  if (taskInfo.id) {
+    taskModel.id = taskInfo.id;
+  }
+  taskModel.infoHash = taskInfo.infoHash;
+  taskModel.magnetURI = taskInfo.magnetURI;
+  taskModel.name = taskInfo.name;
+  taskModel.path = taskInfo.path;
+  taskModel.progress = taskInfo.progress;
+  taskModel.status = taskInfo.status;
+  taskModel.downloaded = taskInfo.downloaded;
+  taskModel.length = taskInfo.length;
+  taskModel.files = taskInfo.files.map(torrentFileToFileModel);
+  return taskModel;
+};
+const getUserDataPath = () => {
+  return app.getPath("userData");
+};
+const getDownloadPath = () => {
+  return app.getPath("downloads");
+};
+const getConfigBasePath = () => {
+  const path2 = getUserDataPath();
+  return path2;
 };
 const filePath = path.join(__dirname, "../../resources/best-tracker-list.txt");
 console.log("filePath", filePath);
@@ -259,6 +239,40 @@ const getAnnounce = () => {
     });
   });
 };
+class SettingManage {
+  configStore;
+  constructor() {
+    console.log("SettingManage init");
+  }
+  async initConfig() {
+    const announce = await getAnnounce();
+    this.configStore = new Store({
+      name: "config",
+      cwd: getConfigBasePath(),
+      defaults: {
+        downloadPath: getDownloadPath(),
+        clientOptions: {
+          maxConns: 55,
+          tracker: {
+            announce
+          },
+          utp: true,
+          webSeeds: true,
+          blocklist: [],
+          downloadLimit: -1,
+          uploadLimit: -1
+        }
+      }
+    });
+  }
+  getConfig() {
+    return this.configStore.store;
+  }
+  getClientConfig() {
+    return this.configStore.store.clientOptions;
+  }
+}
+const settingManage = new SettingManage();
 const getTorrentFiles = async (instance, magnetURI) => {
   return new Promise(async (resolve, reject) => {
     const t = await instance.get(magnetURI);
@@ -290,13 +304,9 @@ class Downloader {
     this.win = win;
     this.initWebtorrent();
   }
-  async initWebtorrent() {
-    const announce = await getAnnounce();
-    this.instance = new Webtorrent({
-      tracker: {
-        announce
-      }
-    });
+  initWebtorrent() {
+    const config = settingManage.getClientConfig();
+    this.instance = new Webtorrent(config);
   }
   async getFilesByUrl(magnetURI) {
     const { files, torrent } = await getTorrentFiles(this.instance, magnetURI);
@@ -340,22 +350,36 @@ class Downloader {
   handleTorrentProgressUpdate(torrent) {
     console.log(`${torrent.name} progress:`, torrent.progress);
   }
-  startDownload(torrentList, options) {
+  async startDownload(torrentList, options) {
     const result = [];
-    torrentList.forEach(async (item) => {
-      let t = await this.instance.get(item.magnetURI);
+    const promiseList = [];
+    const handleTorrent = async (item) => {
+      const t = await this.instance.get(item.magnetURI);
       if (t) {
         this.instance.remove(t);
+        result.push(torrentToTaskInfo(t));
+        this.downloadingTasks.push(t);
+        return;
       }
-      t = this.instance.add(item.magnetURI, { path: options.downloadPath }, (torrent) => {
-        this.selectFilesInTorrent(torrent, item.selectFiles);
-        torrent.on("done", () => {
-          this.handleTorrentDone(torrent);
+      await new Promise((resolve, reject) => {
+        this.instance.add(item.magnetURI, { path: options.downloadPath }, (torrent) => {
+          this.selectFilesInTorrent(torrent, item.selectFiles);
+          result.push(torrentToTaskInfo(torrent));
+          this.downloadingTasks.push(torrent);
+          resolve(null);
+          torrent.on("done", () => {
+            this.handleTorrentDone(torrent);
+          });
+          torrent.on("error", () => {
+            reject(null);
+          });
         });
       });
-      result.push(torrentToTaskInfo(t));
-      this.downloadingTasks.push(t);
+    };
+    torrentList.forEach((item) => {
+      promiseList.push(handleTorrent(item));
     });
+    await Promise.all(promiseList);
     return result;
   }
   async pauseTorrent(magnetURI) {
@@ -388,11 +412,56 @@ class Downloader {
     this.instance.destroy();
   }
 }
+class TaskService {
+  static instance;
+  dataSource;
+  //使用单例模式
+  static getInstance() {
+    if (!this.instance) {
+      this.instance = new TaskService();
+    }
+    return this.instance;
+  }
+  constructor() {
+    this.dataSource = db.dataSource;
+  }
+  //初始化主角进程监听事件
+  //实现新增方法
+  async create(tasks) {
+    await this.dataSource.initialize();
+    console.log("taskModels", tasks);
+    const res = await this.dataSource.manager.save(tasks);
+    console.log("res", res);
+    await this.dataSource.destroy();
+    return res;
+  }
+  async update(tasks) {
+    await this.dataSource.initialize();
+    const res = await this.dataSource.manager.save(tasks);
+    await this.dataSource.destroy();
+    return res;
+  }
+  //实现分页查询
+  async getList(options) {
+    await this.dataSource.initialize();
+    const sort = options.sort === 2 ? "ASC" : "DESC";
+    const listAndCount = await this.dataSource.createQueryBuilder(TaskModel, "task").orderBy("task.createTime", sort).getManyAndCount();
+    await this.dataSource.destroy();
+    return { list: listAndCount[0], count: listAndCount[1] };
+  }
+  close() {
+    this.dataSource.destroy();
+    console.log("TaskService closed");
+  }
+}
 class DownloaderService {
   downloaderInstance;
+  taskService;
   constructor(win) {
     this.initListeners();
     this.downloaderInstance = new Downloader(win);
+    this.taskService = new TaskService();
+    this.initData();
   }
   initListeners() {
     ipcMain.handle(IPC_CHANNEL.GET_FILES_BY_URL, async (_, magnetURI) => {
@@ -403,8 +472,13 @@ class DownloaderService {
     });
     ipcMain.handle(
       IPC_CHANNEL.START_DOWNLOAD,
-      (_, torrentList, options) => {
-        return this.downloaderInstance.startDownload(torrentList, options);
+      async (_, torrentList, options) => {
+        const result = await this.downloaderInstance.startDownload(torrentList, options);
+        console.log("startDownload", result);
+        const taskModels = result.map(taskInfoToTaskModel);
+        const databaseResult = await this.taskService.create(taskModels);
+        console.log("databaseResult", databaseResult);
+        return result;
       }
     );
     ipcMain.handle(IPC_CHANNEL.GET_DOWNLOADING_TASKS, () => {
@@ -426,73 +500,43 @@ class DownloaderService {
       this.downloaderInstance.deleteTorrent(magnetURI);
     });
   }
+  async initData() {
+    const { count, list } = await this.taskService.getList({ pageNum: 1, pageSize: 100, sort: 2 });
+    console.log(count, list);
+  }
   close() {
     this.downloaderInstance.destroy();
   }
 }
-class TaskService {
-  static instance;
-  dataSource;
-  //使用单例模式
-  static getInstance() {
-    if (!this.instance) {
-      this.instance = new TaskService();
-    }
-    return this.instance;
-  }
+class SettingManageService {
   constructor() {
-    this.dataSource = db.dataSource;
-    this.init();
+    this.initListeners();
   }
-  //初始化主角进程监听事件
-  init() {
-    ipcMain.handle(DB_IPC_CHANNEL.CREATE_TASK, async (_, data) => {
-      const task = new TaskModel();
-      Object.keys(data.task).forEach((key) => {
-        task[key] = data.task[key];
-      });
-      const res = await this.create(task);
-      return res;
+  initListeners() {
+    ipcMain.handle(IPC_CONFIG_CHANNEL.GET_CONFIG, () => {
+      return settingManage.getConfig();
     });
   }
-  //实现新增方法
-  async create(task) {
-    await this.dataSource.initialize();
-    const res = await this.dataSource.manager.save(task);
-    await this.dataSource.destroy();
-    return res;
-  }
-  async update(task) {
-    await this.dataSource.initialize();
-    const res = await this.dataSource.manager.save(task);
-    await this.dataSource.destroy();
-    return res;
-  }
-  //实现分页查询
-  async getList(options) {
-    await this.dataSource.initialize();
-    const sort = options.sort === 2 ? "ASC" : "DESC";
-    const listAndCount = await this.dataSource.createQueryBuilder(TaskModel, "task").orderBy("task.createTime", sort).take(options.pageSize).getManyAndCount();
-    await this.dataSource.destroy();
-    return { list: listAndCount[0], count: listAndCount[1] };
-  }
   close() {
-    this.dataSource.destroy();
-    console.log("TaskService closed");
+    console.log("close");
   }
 }
 let taskService;
 let downloaderService;
-const initService = (win) => {
+let settingManageService;
+const initService = async (win) => {
   console.log("Service initialized");
+  await settingManage.initConfig();
   taskService = new TaskService();
   downloaderService = new DownloaderService(win);
+  settingManageService = new SettingManageService();
 };
 const closeService = () => {
   console.log("Service closed");
   taskService.close();
   downloaderService.close();
   db.close();
+  settingManageService.close();
 };
 let mainWindow;
 function createWindow() {
@@ -530,8 +574,6 @@ app.whenReady().then(() => {
   });
   ipcMain.on("ping", () => console.log("pong"));
   createWindow();
-  const settingManage = new SettingManage();
-  console.log(settingManage);
   initService(mainWindow);
   initDialog();
   app.on("activate", function() {

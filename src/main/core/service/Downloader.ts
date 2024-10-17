@@ -2,17 +2,16 @@ import { IPC_CHANNEL } from "@shared/ipc";
 import { ipcMain } from "electron";
 import { Downloader } from "../Downloader";
 import { GetFilesByUrlRes } from "@shared/type";
-import { TaskService } from "../db/Task";
-import { taskInfoToTaskModel } from "src/main/utils/transformer";
+import { taskInfoToTaskModel, torrentToTaskInfo } from "../../utils/transformer";
+import taskRepository from "../db/Task";
 
 export class DownloaderService {
   downloaderInstance!: Downloader;
-  taskService: TaskService;
 
   constructor(win: Electron.BrowserWindow) {
     this.initListeners();
     this.downloaderInstance = new Downloader(win);
-    this.taskService = new TaskService();
+    this.initData();
   }
 
   initListeners() {
@@ -34,20 +33,22 @@ export class DownloaderService {
         options: { downloadPath?: string },
       ) => {
         const result = await this.downloaderInstance.startDownload(torrentList, options);
-        const taskModels = result.map(taskInfoToTaskModel);
-        this.taskService.create(taskModels);
+        console.log("startDownload", result);
+        const taskModels = result.map((item) => taskInfoToTaskModel(torrentToTaskInfo(item)));
+        const databaseResult = await taskRepository.create(taskModels);
+
+        // 给torrent设置id
+        result.forEach((item, index) => {
+          item.id = databaseResult[index].id;
+        });
+        console.log("databaseResult", databaseResult);
+
         return result;
       },
     );
 
-    ipcMain.handle(IPC_CHANNEL.GET_DOWNLOADING_TASKS, () => {
-      return this.downloaderInstance.getDownloadingTasks();
-    });
-    ipcMain.handle(IPC_CHANNEL.GET_DONE_TASKS, () => {
-      return this.downloaderInstance.getDoneTasks();
-    });
-    ipcMain.handle(IPC_CHANNEL.GET_PAUSED_TASKS, () => {
-      return this.downloaderInstance.getPausedTasks();
+    ipcMain.handle(IPC_CHANNEL.GET_IN_PROGRESS_TASKS, () => {
+      return this.downloaderInstance.getInProgressTasks();
     });
 
     ipcMain.handle(IPC_CHANNEL.PAUSE_TORRENT, (_, magnetURI: string) => {
@@ -60,6 +61,11 @@ export class DownloaderService {
     ipcMain.handle(IPC_CHANNEL.DELETE_TORRENT, (_, magnetURI: string) => {
       this.downloaderInstance.deleteTorrent(magnetURI);
     });
+  }
+
+  async initData() {
+    const { count, list } = await taskRepository.getList({ pageNum: 1, pageSize: 100, sort: 2 });
+    console.log(count, list);
   }
 
   close() {

@@ -1,26 +1,23 @@
 import { ref, shallowRef, onMounted, onUnmounted, watch } from "vue";
 import { TaskInfo } from "@shared/type";
-import { TASK_STATUS } from "../constant";
+
 import { useLoopGetDownloadingTasksInfo } from "./use-loop-get-tasks-info";
-import { getDoneTasks, getPausedTasks } from "@renderer/api/task";
+import { getInProgressTasks } from "@renderer/api/task";
+import { TASK_STATUS } from "../constant";
 
 export const useList = () => {
-  const currentStatus = ref(TASK_STATUS.DOWNLOADING);
+  const currentStatus = ref(TASK_STATUS.IN_PROGRESS);
 
   const taskInfos = shallowRef<TaskInfo[]>([]);
 
-  const handleGetDoneTasks = async () => {
-    taskInfos.value = await getDoneTasks();
-  };
-
-  const handleGetPausedTasks = async () => {
-    taskInfos.value = await getPausedTasks();
+  const handleInProgressTasks = async () => {
+    taskInfos.value = await getInProgressTasks();
   };
 
   const { startLoop, stopLoop } = useLoopGetDownloadingTasksInfo({
     handleSuccess(result) {
       console.log("loop", result);
-      if (currentStatus.value === TASK_STATUS.DOWNLOADING) {
+      if (currentStatus.value === TASK_STATUS.IN_PROGRESS) {
         taskInfos.value = result;
       }
     },
@@ -30,9 +27,8 @@ export const useList = () => {
   });
 
   const getTaskFnMap = {
-    [TASK_STATUS.DONE]: handleGetDoneTasks,
-    [TASK_STATUS.PAUSED]: handleGetPausedTasks,
-    [TASK_STATUS.DOWNLOADING]: startLoop,
+    [TASK_STATUS.DONE]: handleInProgressTasks,
+    [TASK_STATUS.IN_PROGRESS]: startLoop,
   };
 
   const updateTaskInfos = (status: TASK_STATUS) => {

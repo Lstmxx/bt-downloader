@@ -1,4 +1,3 @@
-// src\main\service\TaskService.ts
 import { DataSource } from "typeorm";
 import { db } from "./index";
 import { TaskModel } from "./model";
@@ -9,18 +8,18 @@ export interface TaskListDTO extends ListDTO {}
 export interface ListDTO {
   pageNum: number;
   pageSize: number;
-  sort: number;
+  sort: 1 | 2;
 }
 
 //实现TaskService
-export class TaskService {
-  static instance: TaskService;
+class TaskRepository {
+  static instance: TaskRepository;
   dataSource: DataSource;
 
   //使用单例模式
   static getInstance() {
     if (!this.instance) {
-      this.instance = new TaskService();
+      this.instance = new TaskRepository();
     }
     return this.instance;
   }
@@ -35,7 +34,9 @@ export class TaskService {
   //实现新增方法
   async create(tasks: TaskModel[]) {
     await this.dataSource.initialize();
+    console.log("taskModels", tasks);
     const res = await this.dataSource.manager.save(tasks);
+    console.log("res", res);
     await this.dataSource.destroy();
     return res;
   }
@@ -56,7 +57,7 @@ export class TaskService {
       .createQueryBuilder(TaskModel, "task")
       .orderBy("task.createTime", sort)
       // .skip(skip)
-      .take(options.pageSize)
+      // .take(options.pageSize)
       .getManyAndCount();
     await this.dataSource.destroy();
     return { list: listAndCount[0], count: listAndCount[1] };
@@ -66,3 +67,7 @@ export class TaskService {
     console.log("TaskService closed");
   }
 }
+
+const taskRepository = new TaskRepository();
+
+export default taskRepository;

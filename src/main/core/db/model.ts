@@ -3,8 +3,8 @@ import { Entity, PrimaryColumn, Column, OneToMany, ManyToOne } from "typeorm";
 
 @Entity()
 export class TaskModel {
-  @PrimaryColumn({ type: "int" })
-  id: number;
+  @PrimaryColumn({ type: "text" })
+  id: string;
 
   @Column({ type: "text", nullable: false })
   infoHash: string;
@@ -39,8 +39,8 @@ export class TaskModel {
 
 @Entity()
 export class FileModel {
-  @PrimaryColumn({ type: "int" })
-  id: number;
+  @PrimaryColumn({ type: "text" })
+  id: string;
 
   @Column({ type: "text", nullable: false })
   name: string;

@@ -8,7 +8,7 @@ export interface SettingConfig {
 
 // 定义 File 类型
 export interface TorrentFile {
-  id?: number;
+  id?: string;
   name: string;
   length: number;
   progress: number;
@@ -25,7 +25,7 @@ export interface TorrentPiece {
 
 export interface TaskInfo {
   // database id
-  id?: number;
+  id?: string;
 
   infoHash: string;
 
