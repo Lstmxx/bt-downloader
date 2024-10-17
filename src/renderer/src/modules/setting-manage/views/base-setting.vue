@@ -1,27 +1,40 @@
 <script lang="tsx" setup>
-import { ref, onMounted } from "vue";
+import { ref, toRaw } from "vue";
 import Tabs from "primevue/tabs";
 import TabList from "primevue/tablist";
 import Tab from "primevue/tab";
 import DownloaderSetting from "../components/downloader-setting.vue";
 import { SETTING_VIEW_LIST, SETTING_VIEW } from "../constant";
-import { SettingConfig } from "@shared/type";
-import { getConfig } from "@renderer/api/setting";
+import { setConfig } from "@renderer/api/setting";
+import { useToast } from "primevue/usetoast";
+
+import Button from "primevue/button";
+import { useSettingStore } from "@renderer/store/setting";
 
 const currentSettingView = ref(SETTING_VIEW.DOWNLOADER_SETTING);
-const config = ref<SettingConfig>({
-  downloadPath: "",
-  clientOptions: {},
-});
 
-const handleGetConfig = async () => {
-  config.value = await getConfig();
-  console.log("handleGetConfig", config.value);
+const configStore = useSettingStore();
+
+const toast = useToast();
+
+const loading = ref(false);
+const handleSetConfig = async () => {
+  console.log("handleSetConfig", configStore.config);
+  loading.value = true;
+
+  try {
+    await setConfig(toRaw(configStore.config));
+  } catch (error) {
+    console.log(error);
+    toast.add({
+      severity: "error",
+      summary: "Error",
+      detail: "保存失败",
+    });
+  } finally {
+    loading.value = false;
+  }
 };
-
-onMounted(() => {
-  handleGetConfig();
-});
 </script>
 
 <template>
@@ -33,8 +46,11 @@ onMounted(() => {
         </Tab>
       </TabList>
     </Tabs>
-    <div class="tw-flex-1">
-      <DownloaderSetting v-model="config.clientOptions" />
+    <div class="flex-1 flex justify-center flex-col p-24 items-center">
+      <DownloaderSetting v-model="configStore.config.clientOptions" class="flex-1" />
+      <div class="w-full flex justify-center items-center">
+        <Button type="button" label="保存" :loading="loading" @click="handleSetConfig" />
+      </div>
     </div>
   </div>
 </template>

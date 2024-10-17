@@ -1,4 +1,8 @@
-export const IPC_CHANNEL = {
+export const SYSTEM_IPC_CHANNEL = {
+  READY: "system:ready",
+};
+
+export const DOWNLOAD_IPC_CHANNEL = {
   GET_FILES_BY_URL: "downloader:get-files-by-url",
   GET_DOWNLOADING_TASKS: "downloader:get-downloading-tasks",
   START_DOWNLOAD: "downloader:start-download",
@@ -10,6 +14,7 @@ export const IPC_CHANNEL = {
   GET_PAUSED_TASKS: "downloader:get-paused-tasks",
   DELETE_TORRENT: "downloader:delete-torrent",
   GET_IN_PROGRESS_TASKS: "downloader:get-in-progress-tasks",
+  SET_SPEED: "downloader:set-speed",
 };
 
 export const DB_IPC_CHANNEL = {

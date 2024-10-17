@@ -10,6 +10,10 @@ const props = defineProps({
     type: Array as PropType<TorrentFile[]>,
     default: () => [],
   },
+  path: {
+    type: String,
+    default: "",
+  },
 });
 
 const getFileTypeIcon = (file: TorrentFile) => {
@@ -53,7 +57,7 @@ const formattedFileList = computed(() => {
       <div class="flex flex-col gap-2">
         <ProgressBar :value="file.progress" />
         <div class="flex justify-between">
-          <span>路径：{{ file.path }}</span>
+          <span>路径：{{ `${path}` }}</span>
           <span>{{ file.downloaded }} / {{ file.length }}</span>
         </div>
       </div>

@@ -38,6 +38,10 @@ class SettingManage {
   getClientConfig(): WebTorrent.Options {
     return this.configStore.store.clientOptions;
   }
+  setConfig(config: SettingConfig) {
+    this.configStore.store = config;
+    return this.configStore.store;
+  }
 }
 
 export const settingManage = new SettingManage();

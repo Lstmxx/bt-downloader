@@ -1,14 +1,16 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import Webtorrent from "webtorrent";
 import { promises as fs } from "node:fs";
 import { Notification } from "electron";
 
-import { IPC_CHANNEL } from "@shared/ipc";
-import { GetFilesByUrlRes } from "@shared/type";
-import { taskInfoToTaskModel, torrentFileToFile, torrentToTaskInfo } from "../utils/transformer";
+import { DOWNLOAD_IPC_CHANNEL } from "@shared/ipc";
+import { GetFilesByUrlRes, TaskInfo } from "@shared/type";
+import { taskInfoToTaskModel, taskModelToTaskInfo, torrentFileToFile, torrentToTaskInfo } from "../utils/transformer";
 import { getFileDialog } from "./dialog";
 
 import { settingManage } from "./SettingManage";
 import taskRepository from "./db/Task";
+import { TaskModel } from "./db/model";
 
 // const torrentProgress = () => {};
 
@@ -43,6 +45,7 @@ export class Downloader {
   win: Electron.BrowserWindow;
 
   inProgressTasks: Webtorrent.Torrent[] = [];
+  inProgressTaskInfo: TaskInfo[] = [];
 
   constructor(win: Electron.BrowserWindow) {
     this.win = win;
@@ -52,6 +55,11 @@ export class Downloader {
   initWebtorrent() {
     const config = settingManage.getClientConfig();
     this.instance = new Webtorrent(config);
+  }
+
+  setSpeed(uploadSpeed: number, downloadSpeed: number) {
+    (this.instance as any).throttleDownload(downloadSpeed);
+    (this.instance as any).throttleUpload(uploadSpeed);
   }
 
   async getFilesByUrl(magnetURI: string): Promise<GetFilesByUrlRes> {
@@ -78,7 +86,7 @@ export class Downloader {
       // todo save task
       taskRepository.update([taskInfoToTaskModel(torrentToTaskInfo(task[0]))]);
     }
-    this.win.webContents.send(IPC_CHANNEL.TORRENT_DONE, magnetURI);
+    this.win.webContents.send(DOWNLOAD_IPC_CHANNEL.TORRENT_DONE, magnetURI);
     new Notification({ title: torrent.name, body: "下载完成" }).show();
   }
 
@@ -93,7 +101,7 @@ export class Downloader {
   }
 
   getInProgressTasks() {
-    return this.inProgressTasks.map(torrentToTaskInfo);
+    return [...this.inProgressTaskInfo, ...this.inProgressTasks.map(torrentToTaskInfo)];
   }
 
   handleTorrentProgressUpdate(torrent: Webtorrent.Torrent) {
@@ -143,18 +151,15 @@ export class Downloader {
     return result;
   }
 
-  async addTorrents(
-    torrentList: {
-      magnetURI: string;
-      selectFiles: string[];
-      path: string;
-    }[],
-  ) {
+  async addTorrentsFromTaskModel(taskModels: TaskModel[]) {
+    const taskInfos = taskModels.map(taskModelToTaskInfo);
+    this.inProgressTaskInfo.push(...taskInfos);
+
     const result: Webtorrent.Torrent[] = [];
 
     const promiseList: Promise<void>[] = [];
 
-    const handleTorrent = async (item: { magnetURI: string; selectFiles: string[]; path: string }) => {
+    const handleTorrent = async (item: { magnetURI: string; selectFiles: string[]; path: string; id: string }) => {
       const t = await this.instance.get(item.magnetURI);
 
       if (t) {
@@ -164,6 +169,7 @@ export class Downloader {
       await new Promise((resolve, reject) => {
         this.instance.add(item.magnetURI, { path: item.path }, (torrent) => {
           this.selectFilesInTorrent(torrent, item.selectFiles);
+          torrent.id = item.id;
           result.push(torrent);
           torrent.pause();
           resolve(null);
@@ -177,15 +183,29 @@ export class Downloader {
       });
     };
 
-    torrentList.forEach((item) => {
-      promiseList.push(handleTorrent(item));
+    taskInfos.forEach((item) => {
+      promiseList.push(
+        handleTorrent({
+          magnetURI: item.magnetURI,
+          selectFiles: item.files.map((item) => item.name),
+          path: item.path,
+          id: item.id || "",
+        }),
+      );
     });
 
     await Promise.all(promiseList);
 
     console.log("add torrents", result);
 
-    this.inProgressTasks.push(...result);
+    result.forEach((item) => {
+      const { id } = item;
+      const index = this.inProgressTaskInfo.findIndex((item) => item.id === id);
+      if (index !== -1) {
+        this.inProgressTaskInfo.splice(index);
+      }
+      this.inProgressTasks.push(item);
+    });
 
     return result;
   }
@@ -197,24 +217,28 @@ export class Downloader {
     if (t) {
       t.pause();
     }
+    return t;
   }
 
   async resumeTorrent(id: string) {
     console.log("resume", id);
     const t = this.inProgressTasks.find((item) => item.id === id);
-    console.log("resume", t);
     if (t) {
       t.resume();
       console.log("resume", t.done, t.paused);
     }
+    return t;
   }
 
   async deleteTorrent(id: string) {
-    const t = this.inProgressTasks.find((item) => item.id === id);
-    if (t) {
+    const index = this.inProgressTasks.findIndex((item) => item.id === id);
+    if (index !== -1) {
+      const t = this.inProgressTasks.splice(index, 1)[0];
       t.pause();
       this.instance.remove(t);
+      return true;
     }
+    return false;
   }
 
   destroy() {

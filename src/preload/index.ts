@@ -1,11 +1,12 @@
 import { contextBridge, ipcRenderer } from "electron";
 import { electronAPI } from "@electron-toolkit/preload";
-import { IPC_CHANNEL } from "@shared/ipc";
+import { DOWNLOAD_IPC_CHANNEL, SYSTEM_IPC_CHANNEL } from "@shared/ipc";
 
 // Custom APIs for renderer
 const api = {
   onTorrentDone: (cb: (magnetURI: string) => void) =>
-    ipcRenderer.on(IPC_CHANNEL.TORRENT_DONE, (_event, magnetURI: string) => cb(magnetURI)),
+    ipcRenderer.on(DOWNLOAD_IPC_CHANNEL.TORRENT_DONE, (_event, magnetURI: string) => cb(magnetURI)),
+  onSystemReady: (cb: () => void) => ipcRenderer.on(SYSTEM_IPC_CHANNEL.READY, cb),
 };
 
 // Use `contextBridge` APIs to expose Electron APIs to

@@ -1,4 +1,4 @@
-import { IPC_CHANNEL } from "@shared/ipc";
+import { DOWNLOAD_IPC_CHANNEL, SYSTEM_IPC_CHANNEL } from "@shared/ipc";
 import { ipcMain } from "electron";
 import { Downloader } from "../Downloader";
 import { GetFilesByUrlRes } from "@shared/type";
@@ -7,28 +7,30 @@ import taskRepository from "../db/Task";
 
 export class DownloaderService {
   downloaderInstance!: Downloader;
+  win: Electron.BrowserWindow;
 
-  constructor(win: Electron.BrowserWindow) {
+  constructor(downloaderInstance: Downloader, win: Electron.BrowserWindow) {
+    this.downloaderInstance = downloaderInstance;
+    this.win = win;
     this.initListeners();
-    this.downloaderInstance = new Downloader(win);
     this.initData();
   }
 
   initListeners() {
-    ipcMain.handle(IPC_CHANNEL.GET_FILES_BY_URL, async (_, magnetURI: string): Promise<GetFilesByUrlRes> => {
+    ipcMain.handle(DOWNLOAD_IPC_CHANNEL.GET_FILES_BY_URL, async (_, magnetURI: string): Promise<GetFilesByUrlRes> => {
       return this.downloaderInstance.getFilesByUrl(magnetURI);
     });
-    ipcMain.handle(IPC_CHANNEL.GET_FILES_BY_TORRENT_FILE, async () => {
+    ipcMain.handle(DOWNLOAD_IPC_CHANNEL.GET_FILES_BY_TORRENT_FILE, async () => {
       return this.downloaderInstance.getFilesByTorrentFile();
     });
 
-    ipcMain.handle(IPC_CHANNEL.GET_DONE_TASKS, async () => {
+    ipcMain.handle(DOWNLOAD_IPC_CHANNEL.GET_DONE_TASKS, async () => {
       const tasks = await taskRepository.getDoneTasks();
       return tasks;
     });
 
     ipcMain.handle(
-      IPC_CHANNEL.START_DOWNLOAD,
+      DOWNLOAD_IPC_CHANNEL.START_DOWNLOAD,
       async (
         _,
         torrentList: {
@@ -52,38 +54,40 @@ export class DownloaderService {
       },
     );
 
-    ipcMain.handle(IPC_CHANNEL.GET_IN_PROGRESS_TASKS, () => {
+    ipcMain.handle(DOWNLOAD_IPC_CHANNEL.GET_IN_PROGRESS_TASKS, () => {
       return this.downloaderInstance.getInProgressTasks();
     });
 
-    ipcMain.handle(IPC_CHANNEL.PAUSE_TORRENT, (_, id: string) => {
-      this.downloaderInstance.pauseTorrent(id);
+    ipcMain.handle(DOWNLOAD_IPC_CHANNEL.PAUSE_TORRENT, async (_, id: string) => {
+      const t = await this.downloaderInstance.pauseTorrent(id);
+      if (t) {
+        taskRepository.update([taskInfoToTaskModel(torrentToTaskInfo(t))]);
+      }
     });
 
-    ipcMain.handle(IPC_CHANNEL.RESUME_TORRENT, (_, id: string) => {
-      this.downloaderInstance.resumeTorrent(id);
+    ipcMain.handle(DOWNLOAD_IPC_CHANNEL.RESUME_TORRENT, async (_, id: string) => {
+      const t = await this.downloaderInstance.resumeTorrent(id);
+      if (t) {
+        taskRepository.update([taskInfoToTaskModel(torrentToTaskInfo(t))]);
+      }
     });
-    ipcMain.handle(IPC_CHANNEL.DELETE_TORRENT, (_, id: string) => {
-      this.downloaderInstance.deleteTorrent(id);
+    ipcMain.handle(DOWNLOAD_IPC_CHANNEL.DELETE_TORRENT, async (_, id: string) => {
+      const result = await this.downloaderInstance.deleteTorrent(id);
+      if (result) {
+        taskRepository.deleteTask(id);
+      }
     });
   }
 
   async initData() {
-    const tasks = await taskRepository.getInProgressTasks();
-    console.log("initData", tasks);
-    const taskInfos = tasks.map((item) => {
-      return {
-        magnetURI: item.magnetURI,
-        selectFiles: (item.files || []).map((file) => file.name),
-        path: item.path,
-      };
-    });
-    const result = await this.downloaderInstance.addTorrents(taskInfos);
-    console.log("result", result);
-    result.forEach((item, index) => {
-      item.id = tasks[index].id;
-      console.log("item.id", item.id);
-    });
+    try {
+      const tasks = await taskRepository.getInProgressTasks();
+      await this.downloaderInstance.addTorrentsFromTaskModel(tasks);
+    } catch (error) {
+      console.log(error);
+    } finally {
+      this.win.webContents.send(SYSTEM_IPC_CHANNEL.READY);
+    }
   }
 
   close() {

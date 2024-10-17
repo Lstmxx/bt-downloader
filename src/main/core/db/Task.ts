@@ -83,6 +83,14 @@ class TaskRepository {
     await this.dataSource.destroy();
     return list;
   }
+
+  async deleteTask(id: string) {
+    await this.dataSource.initialize();
+    const res = await this.dataSource.manager.delete(TaskModel, { id });
+    await this.dataSource.destroy();
+    return res;
+  }
+
   close() {
     this.dataSource.destroy();
     console.log("TaskService closed");

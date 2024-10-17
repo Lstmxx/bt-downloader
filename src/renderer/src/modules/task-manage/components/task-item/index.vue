@@ -85,7 +85,7 @@ const { handleDelete, handlePause, handleResume } = useHandler(props);
       </div>
     </div>
     <Divider />
-    <FileList :list="task.files" />
+    <FileList :list="task.files" :path="task.path" />
   </div>
 </template>
 

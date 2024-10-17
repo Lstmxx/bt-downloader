@@ -6,6 +6,7 @@ import { ref } from "vue";
 export const useSettingStore = defineStore("setting-store", () => {
   const config = ref<SettingConfig>({
     downloadPath: "",
+    clientOptions: {},
   });
 
   const handleGetConfig = async () => {

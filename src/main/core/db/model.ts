@@ -54,6 +54,9 @@ export class FileModel {
   @Column({ type: "int", nullable: false })
   downloaded: number;
 
+  @Column({ type: "int", nullable: false })
+  progress: number;
+
   @ManyToOne(() => TaskModel, (task) => task.files)
   task: TaskModel;
 }

@@ -1,6 +1,9 @@
 import { contextBridge, ipcRenderer } from "electron";
 import { electronAPI } from "@electron-toolkit/preload";
-const IPC_CHANNEL = {
+const SYSTEM_IPC_CHANNEL = {
+  READY: "system:ready"
+};
+const DOWNLOAD_IPC_CHANNEL = {
   GET_FILES_BY_URL: "downloader:get-files-by-url",
   GET_DOWNLOADING_TASKS: "downloader:get-downloading-tasks",
   START_DOWNLOAD: "downloader:start-download",
@@ -11,10 +14,12 @@ const IPC_CHANNEL = {
   GET_FILES_BY_TORRENT_FILE: "downloader:get-files-by-torrent-file",
   GET_PAUSED_TASKS: "downloader:get-paused-tasks",
   DELETE_TORRENT: "downloader:delete-torrent",
-  GET_IN_PROGRESS_TASKS: "downloader:get-in-progress-tasks"
+  GET_IN_PROGRESS_TASKS: "downloader:get-in-progress-tasks",
+  SET_SPEED: "downloader:set-speed"
 };
 const api = {
-  onTorrentDone: (cb) => ipcRenderer.on(IPC_CHANNEL.TORRENT_DONE, (_event, magnetURI) => cb(magnetURI))
+  onTorrentDone: (cb) => ipcRenderer.on(DOWNLOAD_IPC_CHANNEL.TORRENT_DONE, (_event, magnetURI) => cb(magnetURI)),
+  onSystemReady: (cb) => ipcRenderer.on(SYSTEM_IPC_CHANNEL.READY, cb)
 };
 if (process.contextIsolated) {
   try {

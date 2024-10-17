@@ -38,9 +38,9 @@ export const useList = () => {
   };
 
   watch(
-    currentStatus,
-    (status) => {
-      updateTaskInfos(status);
+    () => [currentStatus],
+    () => {
+      updateTaskInfos(currentStatus.value);
     },
     {
       immediate: true,

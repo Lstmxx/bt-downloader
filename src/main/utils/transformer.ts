@@ -43,7 +43,7 @@ export const torrentToTaskInfo = (torrent: Webtorrent.Torrent): TaskInfo => {
     createTime: torrent.created,
     maxWebConns: torrent.maxWebConns,
     path: torrent.path,
-    status: torrent.done ? TASK_STATUS.PAUSED : torrent.done ? TASK_STATUS.DONE : TASK_STATUS.DOWNLOADING,
+    status: torrent.paused ? TASK_STATUS.PAUSED : torrent.done ? TASK_STATUS.DONE : TASK_STATUS.DOWNLOADING,
     downloaded: torrent.downloaded,
   };
 };
@@ -55,6 +55,7 @@ export const torrentFileToFileModel = (file: TorrentFile) => {
   fileModel.length = file.length;
   fileModel.name = file.name;
   fileModel.path = file.path;
+  fileModel.progress = file.progress;
   return fileModel;
 };
 
@@ -77,4 +78,33 @@ export const taskInfoToTaskModel = (taskInfo: TaskInfo) => {
   taskModel.length = taskInfo.length;
   taskModel.files = taskInfo.files.map(torrentFileToFileModel);
   return taskModel;
+};
+
+export const fileModelToFile = (fileModel: FileModel): TorrentFile => {
+  return {
+    name: fileModel.name,
+    length: fileModel.length,
+    progress: fileModel.progress,
+    path: fileModel.path,
+    downloaded: fileModel.downloaded,
+  };
+};
+
+export const taskModelToTaskInfo = (taskModel: TaskModel): TaskInfo => {
+  return {
+    id: taskModel.id,
+    infoHash: taskModel.infoHash,
+    magnetURI: taskModel.magnetURI,
+    files: (taskModel.files || []).map(fileModelToFile),
+    downloadSpeed: 0,
+    uploadSpeed: 0,
+    progress: taskModel.progress,
+    length: taskModel.length,
+    name: taskModel.name,
+    createTime: taskModel.createTime,
+    maxWebConns: 0,
+    path: taskModel.path,
+    status: taskModel.status as TASK_STATUS,
+    downloaded: taskModel.downloaded,
+  };
 };
